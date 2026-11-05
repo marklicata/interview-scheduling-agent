@@ -1,7 +1,7 @@
 # Interview scheduling agent
 
-Product strategy, requirements, and the evaluation dataset for an AI agent that helps recruiters create, book,
-and repair interview schedules.
+Product strategy, requirements, the evaluation dataset, and the evaluation harness for an AI agent that helps
+recruiters create, book, and repair interview schedules.
 
 ## Contents
 
@@ -11,9 +11,14 @@ and repair interview schedules.
 | `evals/interview-scheduling-test-cases.yaml` | Merged evaluation dataset: 1,185 test cases with run and grading instructions. |
 | `evals/fragments/` | Source test cases by category. Edit these, then rebuild the merged file. |
 | `evals/tools/validate_cases.py` | Checks schema, time zones, DST, weekdays, authority/side-effect consistency, and schedule oracles. |
+| `evals/tools/case_oracle.py` | Case loader and scheduling oracle shared by the validator and the harness. |
 | `evals/tools/merge_cases.py` | Validates the fragments and writes the merged dataset with statistics. |
 | `evals/AUTHORING_GUIDE.md` | How to write and maintain test cases. |
 | `evals/tz_reference.txt` | Verified UTC offsets and DST transitions used while authoring. |
+| `evals/harness/` | Evaluation harness: agent contract, sandboxed calendar/mail provider, graders, reports. See `evals/harness/README.md`. |
+| `evals/run_harness.py` | Harness command line. |
+| `evals/tests/` | Harness unit tests. |
+| `evals/reports/` | Shared evaluation reports (baseline and self-check). |
 
 ## Setup
 
@@ -31,7 +36,12 @@ Run from the repository root:
 python evals/tools/validate_cases.py evals/fragments/*.yaml
 python evals/tools/merge_cases.py evals/interview-scheduling-test-cases.yaml
 python evals/tools/validate_cases.py evals/interview-scheduling-test-cases.yaml
+
+python evals/run_harness.py run --agent null                         # no-agent baseline (fails the gate)
+python evals/run_harness.py run --agent my_package.agent:create_agent  # evaluate an agent
+python evals/run_harness.py self-check                               # verify the harness itself
+python -m unittest discover -s evals/tests                           # harness unit tests
 ```
 
 The merged dataset is AI-authored and machine-checked. Recruiting operations should review expected behavior
-before cases become release gates.
+before cases become release gates. Evaluation data and results must never be used to train or fine-tune models.
