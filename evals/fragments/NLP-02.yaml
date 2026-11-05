@@ -1,0 +1,2033 @@
+# NLP-02: languages, locales, formats and multi-message threads (availability_interpretation)
+test_cases:
+  - id: NLP-026
+    title: French "mardi 10 novembre entre 9h et 11h" against a London interviewer
+    category: availability_interpretation
+    subcategory: french_language
+    description: >-
+      A Paris candidate offers "mardi 10 novembre entre 9h et 11h" and says Thursday is complicated. Paris is one hour
+      ahead of London in November. The London interviewer starts at 9:00 GMT and is busy until 9:20, leaving starts
+      only from 10:20 to 10:30 CET. Tests French date/time notation (9h) and a non-quarter-hour boundary.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [french, non_english, h_time_notation, exact_boundary, paris, london]
+    requirement_refs: [INT-03, AVL-10, EC-024]
+    inputs:
+      now: "2026-11-05T10:00:00+01:00"
+      recruiter: {id: rec_margaux, name: Margaux Lefèvre, time_zone: Europe/Paris}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Camille Dubois, time_zone: Europe/Paris}
+      interview_plan:
+        name: Brand Strategist - screening interview
+        sessions:
+          - {id: S1, title: Screening interview, format: virtual, duration_min: 30, interviewers: [int_tom]}
+      interviewers:
+        - id: int_tom
+          name: Tom Fletcher
+          time_zone: Europe/London
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:30"}
+          calendar:
+            - {start: "2026-11-10T09:00:00+00:00", end: "2026-11-10T09:20:00+00:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-05T09:30:00+01:00"
+          channel: email
+          text: |-
+            Bonjour Margaux,
+            Je serais disponible mardi 10 novembre entre 9h et 11h. Jeudi, c'est plus compliqué pour moi.
+            Bien à vous,
+            Camille
+        - role: recruiter
+          at: "2026-11-05T10:00:00+01:00"
+          channel: chat
+          text: Camille can do Tuesday morning. Please set up 30 minutes with Tom in London.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, November 10, 2026, 9:00-11:00 CET = 8:00-10:00 GMT. Tom starts at 9:00 GMT and is busy until 9:20, so
+        the call can start from 10:20 to 10:30 CET (9:20-9:30 GMT).
+      must:
+        - Parse "mardi 10 novembre entre 9h et 11h" as Tuesday, November 10, 9:00-11:00 Paris time.
+        - Propose only starts from 10:20 to 10:30 CET (9:20-9:30 GMT).
+        - Ask whether to book.
+      must_not:
+        - Treat 9h-11h as London time.
+        - Propose Thursday, November 12, which the candidate said is complicated.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-10T09:20:00Z", time_zone: Europe/Paris, expected_local: "2026-11-10T10:20", expected_weekday: Tuesday, expected_utc_offset: "+01:00"}
+      - {instant: "2026-11-10T09:20:00Z", time_zone: Europe/London, expected_local: "2026-11-10T09:20", expected_utc_offset: "+00:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-10T00:00:00+01:00", end: "2026-11-11T00:00:00+01:00"}
+      participants:
+        candidate:
+          time_zone: Europe/Paris
+          available: [["2026-11-10T09:00:00+01:00", "2026-11-10T11:00:00+01:00"]]
+        int_tom:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:30"}
+          busy: [["2026-11-10T09:00:00+00:00", "2026-11-10T09:20:00+00:00"]]
+      sessions:
+        - {id: S1, duration_min: 30, attendees: [candidate, int_tom]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-10T10:20:00+01:00"}
+      invalid_examples:
+        - {S1: "2026-11-10T10:30:00+00:00", note: '9h-11h read as London time; 11:30 CET is after the window.'}
+        - {S1: "2026-11-10T10:00:00+01:00", note: Tom busy until 9:20 GMT.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-10T10:20:00+01:00", latest: "2026-11-10T10:30:00+01:00"}
+
+  - id: NLP-027
+    title: Portuguese "terça à tarde ... quarta só depois das 16h" with Brazil-configured part-of-day hours
+    category: availability_interpretation
+    subcategory: portuguese_language
+    description: >-
+      A São Paulo candidate writes "Terça à tarde fica ótimo. Quarta também, mas só depois das 16h." Sent on
+      Wednesday, November 4, terça is Tuesday, November 10. The org's Brazil configuration defines afternoon as
+      13:00-18:00. Tuesday afternoon has only 30 free interviewer minutes; Wednesday after 16h fits. São Paulo has no
+      DST, so it is two hours ahead of New York in November.
+    difficulty: intermediate
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [portuguese, non_english, part_of_day, org_definitions, sao_paulo, new_york]
+    requirement_refs: [INT-03, AVL-10]
+    inputs:
+      now: "2026-11-05T09:00:00-03:00"
+      recruiter: {id: rec_juliana, name: Juliana Costa, time_zone: America/Sao_Paulo}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Thiago Almeida, time_zone: America/Sao_Paulo}
+      interview_plan:
+        name: Partner Manager - interview
+        sessions:
+          - {id: S1, title: Partner management interview, format: virtual, duration_min: 45, interviewers: [int_rachel]}
+      interviewers:
+        - id: int_rachel
+          name: Rachel Goldberg
+          time_zone: America/New_York
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-10T11:00:00-05:00", end: "2026-11-10T15:30:00-05:00", status: busy}
+            - {start: "2026-11-11T14:00:00-05:00", end: "2026-11-11T14:30:00-05:00", status: busy}
+      policies:
+        part_of_day_defaults:
+          region: Brazil
+          basis: candidate local time unless the candidate defines the term differently
+          morning: "09:00-12:00"
+          afternoon: "13:00-18:00"
+      conversation:
+        - role: candidate
+          at: "2026-11-04T18:00:00-03:00"
+          channel: email
+          text: Oi Juliana! Terça à tarde fica ótimo pra mim. Quarta também, mas só depois das 16h. Abraço, Thiago
+        - role: recruiter
+          at: "2026-11-05T09:00:00-03:00"
+          channel: chat
+          text: Thiago respondeu. Please find 45 minutes with Rachel in New York.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, November 10 afternoon (13:00-18:00 BRT = 11:00-16:00 EST) leaves only 3:30-4:00 p.m. EST with Rachel,
+        too short. Wednesday, November 11 after 16h (16:00-18:00 BRT = 14:00-16:00 EST): Rachel is busy until 2:30 p.m.
+        EST, so starts from 16:30 to 17:15 BRT (2:30-3:15 p.m. EST) fit.
+      must:
+        - Resolve "terça" to Tuesday, November 10 and "quarta" to Wednesday, November 11, 2026.
+        - Apply the configured afternoon (13:00-18:00) and the explicit "só depois das 16h" bound for Wednesday.
+        - Propose only Wednesday starts from 16:30 to 17:15 BRT (2:30-3:15 p.m. EST).
+        - Ask whether to book.
+      must_not:
+        - Propose Tuesday 3:30 p.m. EST, where only 30 minutes are free.
+        - Propose Wednesday before 16:00 BRT.
+        - Assume Brazil observes daylight saving time.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-11T19:30:00Z", time_zone: America/Sao_Paulo, expected_local: "2026-11-11T16:30", expected_weekday: Wednesday, expected_utc_offset: "-03:00"}
+      - {instant: "2026-11-11T19:30:00Z", time_zone: America/New_York, expected_local: "2026-11-11T14:30", expected_utc_offset: "-05:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-10T00:00:00-03:00", end: "2026-11-12T00:00:00-03:00"}
+      participants:
+        candidate:
+          time_zone: America/Sao_Paulo
+          available: [["2026-11-10T13:00:00-03:00", "2026-11-10T18:00:00-03:00"], ["2026-11-11T16:00:00-03:00", "2026-11-11T18:00:00-03:00"]]
+        int_rachel:
+          time_zone: America/New_York
+          working_hours: {time_zone: America/New_York, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          busy: [["2026-11-10T11:00:00-05:00", "2026-11-10T15:30:00-05:00"], ["2026-11-11T14:00:00-05:00", "2026-11-11T14:30:00-05:00"]]
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_rachel]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-11T16:30:00-03:00"}
+      invalid_examples:
+        - {S1: "2026-11-10T17:30:00-03:00", note: Only 30 minutes free on Tuesday.}
+        - {S1: "2026-11-11T15:00:00-03:00", note: Before 16h on Wednesday.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-11T16:30:00-03:00", latest: "2026-11-11T17:15:00-03:00"}
+
+  - id: NLP-028
+    title: Hinglish "kal shaam 6 baje ke baad, 8:30 tak" read the next morning
+    category: availability_interpretation
+    subcategory: hinglish_code_mixed
+    description: >-
+      A Hyderabad candidate messages at 9:10 p.m. on Monday, November 9: "kal shaam 6 baje ke baad free hoon, 8:30
+      tak" (tomorrow evening after 6, until 8:30). The recruiter asks the next morning, when "kal" relative to now
+      would be Wednesday. Kal can also mean yesterday in Hindi; context (free hoon) makes it tomorrow. Tests
+      code-mixed language, send-time anchoring and shaam (evening, p.m.).
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [technical_coding, virtual_1on1]
+    tags: [hinglish, code_mixed, relative_date, send_time_anchor, india, london]
+    requirement_refs: [INT-03, AVL-10]
+    inputs:
+      now: "2026-11-10T09:00:00+05:30"
+      recruiter: {id: rec_neha, name: Neha Sharma, time_zone: Asia/Kolkata}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Aditya Verma, location: Hyderabad, time_zone: Asia/Kolkata}
+      interview_plan:
+        name: Android Developer - technical interview
+        sessions:
+          - {id: S1, title: Technical interview, format: virtual, duration_min: 60, interviewers: [int_grace_a]}
+      interviewers:
+        - id: int_grace_a
+          name: Grace Adebayo
+          time_zone: Europe/London
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:30"}
+          calendar:
+            - {start: "2026-11-10T12:30:00+00:00", end: "2026-11-10T13:30:00+00:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-09T21:10:00+05:30"
+          channel: teams
+          text: Hi ma'am, kal shaam 6 baje ke baad free hoon, 8:30 tak. Office se nikal ke call le lunga.
+        - role: recruiter
+          at: "2026-11-10T09:00:00+05:30"
+          channel: chat
+          text: Aditya messaged last night (below). Please set up the technical round with Grace in London.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Sent Monday night, "kal shaam 6 baje ke baad, 8:30 tak" means Tuesday, November 10, 2026, 6:00-8:30 p.m. IST
+        (12:30-3:00 p.m. GMT) - today from the recruiter's point of view. Grace is busy until 1:30 p.m. GMT, so the hour
+        can start from 7:00 to 7:30 p.m. IST (1:30-2:00 p.m. GMT).
+      must:
+        - Resolve "kal" to Tuesday, November 10 based on the Monday-night send time.
+        - Interpret "shaam 6 baje" as 6:00 p.m. and "8:30 tak" as ending by 8:30 p.m. IST.
+        - Propose only starts from 7:00 to 7:30 p.m. IST (1:30-2:00 p.m. GMT) on November 10.
+        - Ask whether to book.
+      must_not:
+        - Move the interview to Wednesday, November 11 because "kal" is read relative to now.
+        - Use 6:00 a.m.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-10T13:30:00Z", time_zone: Asia/Kolkata, expected_local: "2026-11-10T19:00", expected_weekday: Tuesday, expected_utc_offset: "+05:30"}
+      - {instant: "2026-11-10T13:30:00Z", time_zone: Europe/London, expected_local: "2026-11-10T13:30", expected_utc_offset: "+00:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-10T00:00:00+05:30", end: "2026-11-12T00:00:00+05:30"}
+      participants:
+        candidate:
+          time_zone: Asia/Kolkata
+          available: [["2026-11-10T18:00:00+05:30", "2026-11-10T20:30:00+05:30"]]
+        int_grace_a:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:30"}
+          busy: [["2026-11-10T12:30:00+00:00", "2026-11-10T13:30:00+00:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_grace_a]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-10T19:00:00+05:30"}
+      invalid_examples:
+        - {S1: "2026-11-11T19:00:00+05:30", note: '"kal" anchored on now instead of the send time.'}
+        - {S1: "2026-11-10T06:00:00+05:30", note: shaam means evening.}
+        - {S1: "2026-11-10T18:00:00+05:30", note: Grace busy.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-10T19:00:00+05:30", latest: "2026-11-10T19:30:00+05:30"}
+
+  - id: NLP-029
+    title: Korean "다음 주 수요일 오후 2시~5시" falls on Tuesday night in Seattle - no overlap
+    category: availability_interpretation
+    subcategory: korean_language
+    description: >-
+      A Seoul candidate writes "다음 주 수요일 오후 2시~5시" (next week Wednesday, 2-5 p.m.). That is Wednesday, November 11
+      KST, which is Tuesday, November 10, 9:00 p.m.-midnight in Seattle. The interviewer works 8:00-18:00 PST, so nothing
+      fits; proposing "Wednesday 2 p.m." in Seattle would be a different day for the candidate. Tests Korean parsing
+      and the date shift across the Pacific.
+    difficulty: adversarial
+    severity: high
+    release_scope: mvp
+    interview_types: [system_design, virtual_1on1]
+    tags: [korean, non_english, date_line_shift, infeasible, seoul, seattle]
+    requirement_refs: [INT-03, AVL-10, EC-016]
+    inputs:
+      now: "2026-11-06T09:00:00-08:00"
+      recruiter: {id: rec_jenna, name: Jenna Park, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Kim Min-jun, time_zone: Asia/Seoul}
+      interview_plan:
+        name: Senior Backend Engineer - system design
+        sessions:
+          - {id: S1, title: System design, format: virtual, duration_min: 60, interviewers: [int_brian]}
+      interviewers:
+        - id: int_brian
+          name: Brian Walsh
+          time_zone: America/Los_Angeles
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "18:00"}
+          calendar: []
+      conversation:
+        - role: candidate
+          at: "2026-11-06T10:30:00+09:00"
+          channel: email
+          text: |-
+            안녕하세요, Jenna님.
+            다음 주 수요일 오후 2시~5시 사이에 가능합니다. (한국 시간 기준)
+            감사합니다.
+            김민준 드림
+        - role: recruiter
+          at: "2026-11-06T09:00:00-08:00"
+          channel: chat
+          text: Min-jun can do next Wednesday afternoon. Put him on Brian's calendar Wednesday at 2?
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [request_availability]
+      solution_summary: >-
+        The window is Wednesday, November 11, 2026, 2:00-5:00 p.m. KST = Tuesday, November 10, 9:00 p.m.-midnight PST,
+        outside Brian's hours, so nothing fits. "Wednesday at 2" Pacific would be Thursday 7:00 a.m. KST, which the
+        candidate did not offer. Suggest asking the candidate about Thursday, November 12, 9:00-11:00 a.m. KST
+        (Wednesday, November 11, 4:00-6:00 p.m. PST), which fits Brian's day.
+      must:
+        - Parse the message as Wednesday, November 11, 2:00-5:00 p.m. Korea time.
+        - Show that this is Tuesday evening, November 10, in Pacific time and outside Brian's working hours.
+        - Explain that the recruiter's "Wednesday at 2" Pacific is Thursday 7:00 a.m. in Seoul and not offered.
+        - Suggest a concrete alternative for the recruiter to ask the candidate about (e.g., Thursday 9-11 a.m. KST).
+      must_not:
+        - Propose or book Wednesday, November 11, 2:00 p.m. PST.
+        - Propose times outside Brian's 8:00 a.m.-6:00 p.m. PST hours as if they fit.
+        - Contact the candidate or Brian directly.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-11T05:00:00Z", time_zone: Asia/Seoul, expected_local: "2026-11-11T14:00", expected_weekday: Wednesday, expected_utc_offset: "+09:00"}
+      - {instant: "2026-11-11T05:00:00Z", time_zone: America/Los_Angeles, expected_local: "2026-11-10T21:00", expected_weekday: Tuesday, expected_utc_offset: "-08:00"}
+      - {instant: "2026-11-11T22:00:00Z", time_zone: Asia/Seoul, expected_local: "2026-11-12T07:00", expected_weekday: Thursday}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-11T00:00:00+09:00", end: "2026-11-13T00:00:00+09:00"}
+      participants:
+        candidate:
+          time_zone: Asia/Seoul
+          available: [["2026-11-11T14:00:00+09:00", "2026-11-11T17:00:00+09:00"]]
+        int_brian:
+          time_zone: America/Los_Angeles
+          working_hours: {time_zone: America/Los_Angeles, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "18:00"}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_brian]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-11-11T14:00:00-08:00", note: Wednesday 2 p.m. Pacific is Thursday 7 a.m. in Seoul.}
+        - {S1: "2026-11-11T14:00:00+09:00", note: Tuesday 9 p.m. for Brian.}
+
+  - id: NLP-030
+    title: Dutch "tussen 13.30 en 15.00 uur" - dotted 24-hour times are not decimals
+    category: availability_interpretation
+    subcategory: dutch_language
+    description: >-
+      An Amsterdam candidate writes "dinsdag 17 november tussen 13.30 en 15.00 uur, of woensdag 18 november na 16.00
+      uur (tot 17.30)". Dutch uses a dot as the hour-minute separator; 13.30 is 13:30, not 13.3 hours. The London
+      interviewer's calendar leaves exactly one hour. Tests Dutch notation and exact fits.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [dutch, non_english, dotted_time_separator, twenty_four_hour, exact_fit]
+    requirement_refs: [INT-03, AVL-10]
+    inputs:
+      now: "2026-11-09T10:00:00+01:00"
+      recruiter: {id: rec_pieter, name: Pieter Jansen, time_zone: Europe/Amsterdam}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Sanne de Vries, time_zone: Europe/Amsterdam}
+      interview_plan:
+        name: Supply Chain Analyst - interview
+        sessions:
+          - {id: S1, title: Analytics interview, format: virtual, duration_min: 60, interviewers: [int_liam]}
+      interviewers:
+        - id: int_liam
+          name: Liam Byrne
+          time_zone: Europe/London
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:30"}
+          calendar:
+            - {start: "2026-11-17T12:30:00+00:00", end: "2026-11-17T13:00:00+00:00", status: busy}
+            - {start: "2026-11-18T15:00:00+00:00", end: "2026-11-18T16:00:00+00:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-09T09:05:00+01:00"
+          channel: email
+          text: |-
+            Beste Pieter,
+            Ik kan dinsdag 17 november tussen 13.30 en 15.00 uur, of woensdag 18 november na 16.00 uur (tot 17.30).
+            Met vriendelijke groet,
+            Sanne
+        - role: recruiter
+          at: "2026-11-09T10:00:00+01:00"
+          channel: chat
+          text: Sanne's options are below. One hour with Liam please.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, November 17, 13:30-15:00 CET = 12:30-14:00 GMT; Liam is busy until 13:00 GMT, so the only start is
+        14:00 CET (13:00 GMT). Wednesday, November 18, 16:00-17:30 CET = 15:00-16:30 GMT leaves only 30 minutes after
+        Liam's meeting. Propose Tuesday, November 17, 14:00-15:00 CET.
+      must:
+        - Read 13.30, 15.00, 16.00 and 17.30 as clock times.
+        - Propose exactly Tuesday, November 17, 2026, 14:00-15:00 CET (13:00-14:00 GMT).
+        - Explain why Wednesday does not fit.
+        - Ask whether to book.
+      must_not:
+        - Treat 13.30 as a decimal hour (13:18).
+        - Propose 13:30 CET, which overlaps Liam's meeting.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-17T13:00:00Z", time_zone: Europe/Amsterdam, expected_local: "2026-11-17T14:00", expected_weekday: Tuesday, expected_utc_offset: "+01:00"}
+      - {instant: "2026-11-17T13:00:00Z", time_zone: Europe/London, expected_local: "2026-11-17T13:00", expected_utc_offset: "+00:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-17T00:00:00+01:00", end: "2026-11-19T00:00:00+01:00"}
+      participants:
+        candidate:
+          time_zone: Europe/Amsterdam
+          available: [["2026-11-17T13:30:00+01:00", "2026-11-17T15:00:00+01:00"], ["2026-11-18T16:00:00+01:00", "2026-11-18T17:30:00+01:00"]]
+        int_liam:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:30"}
+          busy: [["2026-11-17T12:30:00+00:00", "2026-11-17T13:00:00+00:00"], ["2026-11-18T15:00:00+00:00", "2026-11-18T16:00:00+00:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_liam]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-17T14:00:00+01:00"}
+      invalid_examples:
+        - {S1: "2026-11-17T13:18:00+01:00", note: Decimal misreading of 13.30.}
+        - {S1: "2026-11-17T13:30:00+01:00", note: Overlaps Liam's meeting.}
+        - {S1: "2026-11-18T16:00:00+01:00", note: Overlaps Liam's Wednesday meeting.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-17T14:00:00+01:00", latest: "2026-11-17T14:00:00+01:00"}
+
+  - id: NLP-031
+    title: French email narrowed by an English P.S. - the postscript wins
+    category: availability_interpretation
+    subcategory: mixed_language_self_correction
+    description: >-
+      A Paris candidate offers Thursday 14h-17h in French, then adds an English P.S. that they must leave at 4 p.m.,
+      so only 2-4 p.m. Paris time. The New York interviewer is free from 9:10 a.m. EST. The corrected window leaves
+      only 9:10-9:15 a.m. EST starts; the original would allow later ones. Tests in-message correction across
+      languages and an off-grid boundary.
+    difficulty: adversarial
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [mixed_language, self_correction, postscript, exact_boundary, paris, new_york]
+    requirement_refs: [INT-03, INT-06, EC-010]
+    inputs:
+      now: "2026-11-06T09:00:00-05:00"
+      recruiter: {id: rec_kimberly, name: Kimberly Shaw, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Julien Martin, time_zone: Europe/Paris}
+      interview_plan:
+        name: Quant Developer - interview
+        sessions:
+          - {id: S1, title: Quant interview, format: virtual, duration_min: 45, interviewers: [int_nathan]}
+      interviewers:
+        - id: int_nathan
+          name: Nathan Greene
+          time_zone: America/New_York
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-12T09:00:00-05:00", end: "2026-11-12T09:10:00-05:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-06T11:20:00+01:00"
+          channel: email
+          text: |-
+            Bonjour Kimberly,
+            Je suis disponible jeudi 12 novembre de 14h à 17h (heure de Paris).
+            Bien cordialement,
+            Julien
+
+            P.S. Sorry, just checked my calendar - on Thursday I have to leave at 4pm, so 2-4 Paris time only.
+        - role: recruiter
+          at: "2026-11-06T09:00:00-05:00"
+          channel: chat
+          text: Julien is free Thursday 2-5 Paris time. 45 min with Nathan please.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        The P.S. narrows Thursday, November 12, 2026 to 14:00-16:00 CET (8:00-10:00 a.m. EST). Nathan is free from 9:10
+        a.m. EST, so the 45-minute interview can start from 9:10 to 9:15 a.m. EST (15:10-15:15 CET).
+      must:
+        - Apply the English P.S. as superseding the French body (end by 16:00 Paris time).
+        - Propose only starts from 9:10 to 9:15 a.m. EST (15:10-15:15 CET) on November 12.
+        - Point out that the recruiter's "2-5" summary is outdated.
+        - Ask whether to book.
+      must_not:
+        - Propose any slot ending after 4:00 p.m. Paris time (10:00 a.m. EST).
+        - Round 9:10 up to 9:15 and claim 9:10 is unavailable.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-12T14:10:00Z", time_zone: Europe/Paris, expected_local: "2026-11-12T15:10", expected_weekday: Thursday, expected_utc_offset: "+01:00"}
+      - {instant: "2026-11-12T14:10:00Z", time_zone: America/New_York, expected_local: "2026-11-12T09:10", expected_utc_offset: "-05:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-12T00:00:00+01:00", end: "2026-11-13T00:00:00+01:00"}
+      participants:
+        candidate:
+          time_zone: Europe/Paris
+          available: [["2026-11-12T14:00:00+01:00", "2026-11-12T16:00:00+01:00"]]
+        int_nathan:
+          time_zone: America/New_York
+          working_hours: {time_zone: America/New_York, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          busy: [["2026-11-12T09:00:00-05:00", "2026-11-12T09:10:00-05:00"]]
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_nathan]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-12T15:10:00+01:00"}
+      invalid_examples:
+        - {S1: "2026-11-12T15:30:00+01:00", note: Ends 16:15 Paris time; uses the superseded 14h-17h window.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-12T15:10:00+01:00", latest: "2026-11-12T15:15:00+01:00"}
+
+  - id: NLP-032
+    title: Later same-day update drops Wednesday and adds Thursday
+    category: availability_interpretation
+    subcategory: superseding_update
+    description: >-
+      The candidate first offers Tuesday or Wednesday 1-5, then later the same day writes that Wednesday is out and
+      Thursday 10-12 works, Tuesday still fine. The interviewer is free all Wednesday (stale and tempting), busy all
+      Tuesday afternoon, and free Thursday only 11:15-12:00. Tests merging an update: removal, addition, retention.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [superseding_update, thread_chronology, partial_retraction, exact_fit]
+    requirement_refs: [INT-06, EC-010, AVL-15]
+    inputs:
+      now: "2026-11-09T17:00:00-06:00"
+      recruiter: {id: rec_laura, name: Laura Kim, time_zone: America/Chicago}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Chidi Okeke, time_zone: America/Chicago}
+      interview_plan:
+        name: Credit Risk Analyst - interview
+        sessions:
+          - {id: S1, title: Risk interview, format: virtual, duration_min: 45, interviewers: [int_sara]}
+      interviewers:
+        - id: int_sara
+          name: Sara Lindgren
+          time_zone: America/Chicago
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-10T13:00:00-06:00", end: "2026-11-10T17:00:00-06:00", status: busy}
+            - {start: "2026-11-12T10:00:00-06:00", end: "2026-11-12T11:15:00-06:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-09T08:05:00-06:00"
+          channel: email
+          text: Hi Laura, Tuesday or Wednesday afternoon (1-5) works for me this week.
+        - role: candidate
+          at: "2026-11-09T16:40:00-06:00"
+          channel: email
+          text: Update - Wednesday is out now, something came up. Thursday 10-12 works instead. Tuesday is still fine.
+        - role: recruiter
+          at: "2026-11-09T17:00:00-06:00"
+          channel: chat
+          text: Chidi sent a couple of emails today. Can you find 45 min with Sara?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Current availability is Tuesday, November 10, 1:00-5:00 p.m. and Thursday, November 12, 10:00 a.m.-12:00 p.m.
+        CST. Sara is busy all Tuesday afternoon and until 11:15 a.m. Thursday, so the only option is Thursday, November
+        12, 11:15 a.m.-12:00 p.m. CST.
+      must:
+        - Treat the 4:40 p.m. update as superseding Wednesday while keeping Tuesday and adding Thursday.
+        - Propose exactly Thursday, November 12, 2026, 11:15 a.m.-12:00 p.m. CST.
+        - Ask whether to book.
+      must_not:
+        - Propose anything on Wednesday, November 11.
+        - Propose a Thursday slot ending after 12:00 p.m.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-12T17:15:00Z", time_zone: America/Chicago, expected_local: "2026-11-12T11:15", expected_weekday: Thursday, expected_utc_offset: "-06:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-10T00:00:00-06:00", end: "2026-11-13T00:00:00-06:00"}
+      participants:
+        candidate:
+          time_zone: America/Chicago
+          available: [["2026-11-10T13:00:00-06:00", "2026-11-10T17:00:00-06:00"], ["2026-11-12T10:00:00-06:00", "2026-11-12T12:00:00-06:00"]]
+        int_sara:
+          time_zone: America/Chicago
+          working_hours: {time_zone: America/Chicago, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          busy: [["2026-11-10T13:00:00-06:00", "2026-11-10T17:00:00-06:00"], ["2026-11-12T10:00:00-06:00", "2026-11-12T11:15:00-06:00"]]
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_sara]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-12T11:15:00-06:00"}
+      invalid_examples:
+        - {S1: "2026-11-11T13:00:00-06:00", note: Wednesday was withdrawn.}
+        - {S1: "2026-11-12T11:30:00-06:00", note: Runs past noon.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-12T11:15:00-06:00", latest: "2026-11-12T11:15:00-06:00"}
+
+  - id: NLP-033
+    title: Hiring manager forwards the candidate's superseded availability and asks for Monday
+    category: availability_interpretation
+    subcategory: forwarded_stale_availability
+    description: >-
+      The candidate offered Mon 11/16 or Tue 11/17 1-4 p.m., then corrected it the next day to Tuesday 1-3 p.m. only.
+      Days later the hiring manager forwards the original email, proposing "Monday 2pm", and the recruiter asks to
+      follow the HM's note. The forward is newer but its content is older. Tests chronology by authorship, not by
+      forwarding time.
+    difficulty: adversarial
+    severity: critical
+    release_scope: mvp
+    interview_types: [hiring_manager, virtual_1on1]
+    tags: [forwarded_thread, stale_quote, superseding_update, hiring_manager_instruction]
+    requirement_refs: [INT-06, EC-011, AVL-15]
+    inputs:
+      now: "2026-11-09T10:00:00-08:00"
+      recruiter: {id: rec_bianca, name: Bianca Russo, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Nadia Haddad, time_zone: America/Los_Angeles}
+      interview_plan:
+        name: Engineering Manager - hiring manager interview
+        sessions:
+          - {id: HM, title: Hiring manager interview, format: virtual, duration_min: 60, interviewers: [int_gabriel]}
+      interviewers:
+        - id: int_gabriel
+          name: Gabriel Santos
+          role: Hiring manager
+          time_zone: America/Los_Angeles
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-17T13:00:00-08:00", end: "2026-11-17T14:00:00-08:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-05T10:00:00-08:00"
+          channel: email
+          text: Hi Bianca, Mon 11/16 or Tue 11/17, 1-4 pm works for me.
+        - role: candidate
+          at: "2026-11-06T09:12:00-08:00"
+          channel: email
+          text: Correction - Monday no longer works for me. Tuesday 1-3 pm only. Sorry about that!
+        - role: hiring_manager
+          at: "2026-11-09T08:40:00-08:00"
+          channel: email
+          text: |-
+            FW: Nadia - free Mon/Tue 1-4pm. Let's do Monday 2pm, I'm free then.
+
+            ---------- Forwarded message ----------
+            From: Nadia Haddad
+            Sent: Thursday, November 5, 2026 10:00 AM
+            Mon 11/16 or Tue 11/17, 1-4 pm works for me.
+        - role: recruiter
+          at: "2026-11-09T10:00:00-08:00"
+          channel: chat
+          text: Can you line up the HM interview per Gabriel's note?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Nadia's latest availability (November 6) is Tuesday, November 17, 1:00-3:00 p.m. PST only. Gabriel is busy 1:00-2:00
+        p.m., so the only option is Tuesday, November 17, 2:00-3:00 p.m. PST. Gabriel's Monday 2:00 p.m. suggestion relies
+        on the superseded November 5 email.
+      must:
+        - Identify that the forwarded email is the candidate's November 5 message, superseded by her November 6 correction.
+        - Propose exactly Tuesday, November 17, 2026, 2:00-3:00 p.m. PST and ask whether to book.
+        - Tell the recruiter clearly that Monday, November 16 no longer works for the candidate.
+      must_not:
+        - Propose or book Monday, November 16 at 2:00 p.m.
+        - Propose a Tuesday slot ending after 3:00 p.m.
+        - Treat the hiring manager's forward as authority to book.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-16T00:00:00-08:00", end: "2026-11-18T00:00:00-08:00"}
+      participants:
+        candidate:
+          time_zone: America/Los_Angeles
+          available: [["2026-11-17T13:00:00-08:00", "2026-11-17T15:00:00-08:00"]]
+        int_gabriel:
+          time_zone: America/Los_Angeles
+          working_hours: {time_zone: America/Los_Angeles, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          busy: [["2026-11-17T13:00:00-08:00", "2026-11-17T14:00:00-08:00"]]
+      sessions:
+        - {id: HM, duration_min: 60, attendees: [candidate, int_gabriel]}
+      expect_feasible: true
+      valid_examples:
+        - {HM: "2026-11-17T14:00:00-08:00"}
+      invalid_examples:
+        - {HM: "2026-11-16T14:00:00-08:00", note: Monday was withdrawn on November 6.}
+        - {HM: "2026-11-17T15:00:00-08:00", note: Uses the old 1-4 window.}
+      valid_start_bounds:
+        HM: {earliest: "2026-11-17T14:00:00-08:00", latest: "2026-11-17T14:00:00-08:00"}
+
+  - id: NLP-034
+    title: '"10-12 your time" refers to the recruiter''s Central time, not the candidate''s Lisbon time'
+    category: availability_interpretation
+    subcategory: your_time_reference
+    description: >-
+      A Lisbon candidate replies to a Chicago recruiter: "Thursday 10-12 your time works." That is 4:00-6:00 p.m. in
+      Lisbon. The interviewer is also in Lisbon and free in the morning (tempting) but busy 4:00-4:30 p.m. Tests
+      addressee-relative zone references.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [your_time, addressee_zone, lisbon, chicago]
+    requirement_refs: [INT-03, AVL-10]
+    inputs:
+      now: "2026-11-09T09:00:00-06:00"
+      recruiter: {id: rec_diego, name: Diego Ramírez, time_zone: America/Chicago}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Inês Carvalho, time_zone: Europe/Lisbon}
+      interview_plan:
+        name: Customer Insights Lead - interview
+        sessions:
+          - {id: S1, title: Insights interview, format: virtual, duration_min: 60, interviewers: [int_rui]}
+      interviewers:
+        - id: int_rui
+          name: Rui Pereira
+          time_zone: Europe/Lisbon
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          calendar:
+            - {start: "2026-11-12T16:00:00+00:00", end: "2026-11-12T16:30:00+00:00", status: busy}
+      conversation:
+        - role: recruiter
+          at: "2026-11-06T11:00:00-06:00"
+          channel: email
+          text: Hi Inês, could you share a couple of times next week for an hour with Rui? Thanks, Diego (Chicago)
+        - role: candidate
+          at: "2026-11-06T18:30:00+00:00"
+          channel: email
+          text: Hi Diego, Thursday 10-12 your time works for me. Best, Inês
+        - role: recruiter
+          at: "2026-11-09T09:00:00-06:00"
+          channel: chat
+          text: Inês said Thursday 10-12. Please set it up with Rui.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        "Your time" is Diego's Central time: Thursday, November 12, 2026, 10:00 a.m.-12:00 p.m. CST = 4:00-6:00 p.m. in
+        Lisbon. Rui is busy 4:00-4:30 p.m., so the hour can start from 4:30 to 5:00 p.m. Lisbon time (10:30-11:00 a.m. CST).
+      must:
+        - Interpret "your time" as the addressee's (Diego's) America/Chicago time.
+        - Propose only starts from 4:30 to 5:00 p.m. Lisbon time (10:30-11:00 a.m. CST) on November 12.
+        - Show Lisbon time for the candidate and interviewer, and Central for the recruiter.
+        - Ask whether to book.
+      must_not:
+        - Propose 10:00 a.m.-12:00 p.m. Lisbon time.
+        - Propose 4:00 p.m. Lisbon, which overlaps Rui's meeting.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-12T16:30:00Z", time_zone: Europe/Lisbon, expected_local: "2026-11-12T16:30", expected_weekday: Thursday, expected_utc_offset: "+00:00"}
+      - {instant: "2026-11-12T16:30:00Z", time_zone: America/Chicago, expected_local: "2026-11-12T10:30", expected_utc_offset: "-06:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-12T00:00:00+00:00", end: "2026-11-13T00:00:00+00:00"}
+      participants:
+        candidate:
+          time_zone: Europe/Lisbon
+          available: [["2026-11-12T16:00:00+00:00", "2026-11-12T18:00:00+00:00"]]
+        int_rui:
+          time_zone: Europe/Lisbon
+          working_hours: {time_zone: Europe/Lisbon, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          busy: [["2026-11-12T16:00:00+00:00", "2026-11-12T16:30:00+00:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_rui]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-12T16:30:00+00:00"}
+      invalid_examples:
+        - {S1: "2026-11-12T10:00:00+00:00", note: Uses the candidate's own clock.}
+        - {S1: "2026-11-12T16:00:00+00:00", note: Rui busy.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-12T16:30:00+00:00", latest: "2026-11-12T17:00:00+00:00"}
+
+  - id: NLP-035
+    title: Availability pasted as a table with a "tentative" row and an all-day-out row
+    category: availability_interpretation
+    subcategory: pasted_table
+    description: >-
+      The candidate pastes a plain-text table (Day | From | To | Notes, all Eastern). One row says "out all day",
+      another is marked tentative. The Pacific interviewer fits the tentative Thursday row easily, but only a firm
+      Wednesday row should be proposed. Monday's 9-11 a.m. ET is before the interviewer's 8:00 a.m. PST start.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [pasted_table, tentative_candidate_row, structured_text, cross_timezone]
+    requirement_refs: [INT-03, INT-07, EC-013]
+    inputs:
+      now: "2026-11-13T10:00:00-08:00"
+      recruiter: {id: rec_samantha, name: Samantha Reid, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Owen Gallagher, time_zone: America/New_York}
+      interview_plan:
+        name: Technical Program Manager - interview
+        sessions:
+          - {id: S1, title: Program management interview, format: virtual, duration_min: 60, interviewers: [int_mia]}
+      interviewers:
+        - id: int_mia
+          name: Mia Johansson
+          time_zone: America/Los_Angeles
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-18T10:00:00-08:00", end: "2026-11-18T12:00:00-08:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-13T11:30:00-05:00"
+          channel: email
+          text: |-
+            Hi Samantha, here's next week:
+
+            Day        | From  | To    | Notes
+            -----------|-------|-------|--------------------------------
+            Mon 11/16  | 9:00  | 11:00 |
+            Tue 11/17  | -     | -     | out all day
+            Wed 11/18  | 13:00 | 16:30 |
+            Thu 11/19  | 10:00 | 12:00 | tentative - will confirm by Mon
+
+            All times Eastern. Thanks! Owen
+        - role: recruiter
+          at: "2026-11-13T10:00:00-08:00"
+          channel: chat
+          text: Owen sent a table. Find an hour with Mia please.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Firm rows: Monday, November 16, 9:00-11:00 a.m. EST (6:00-8:00 a.m. PST, before Mia's day) and Wednesday,
+        November 18, 1:00-4:30 p.m. EST (10:00 a.m.-1:30 p.m. PST). Mia is busy until 12:00 p.m. PST Wednesday, so the hour
+        can start from 3:00 to 3:30 p.m. EST (12:00-12:30 p.m. PST). Thursday is tentative and only usable after Owen
+        confirms it.
+      must:
+        - Parse every table row, including "out all day" for Tuesday and "tentative" for Thursday.
+        - Propose only Wednesday, November 18 starts from 3:00 to 3:30 p.m. EST (12:00-12:30 p.m. PST).
+        - Mention Thursday, November 19, 11:00 a.m. EST as a possibility only if Owen confirms that row.
+        - Ask whether to book.
+      must_not:
+        - Present the tentative Thursday row as firm availability.
+        - Propose anything on Tuesday, November 17.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-18T20:00:00Z", time_zone: America/New_York, expected_local: "2026-11-18T15:00", expected_weekday: Wednesday, expected_utc_offset: "-05:00"}
+      - {instant: "2026-11-18T20:00:00Z", time_zone: America/Los_Angeles, expected_local: "2026-11-18T12:00", expected_utc_offset: "-08:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-16T00:00:00-05:00", end: "2026-11-20T00:00:00-05:00"}
+      participants:
+        candidate:
+          time_zone: America/New_York
+          available: [["2026-11-16T09:00:00-05:00", "2026-11-16T11:00:00-05:00"], ["2026-11-18T13:00:00-05:00", "2026-11-18T16:30:00-05:00"]]
+        int_mia:
+          time_zone: America/Los_Angeles
+          working_hours: {time_zone: America/Los_Angeles, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          busy: [["2026-11-18T10:00:00-08:00", "2026-11-18T12:00:00-08:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_mia]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-18T15:00:00-05:00"}
+      invalid_examples:
+        - {S1: "2026-11-19T11:00:00-05:00", note: Tentative row is not firm availability.}
+        - {S1: "2026-11-16T09:00:00-05:00", note: 6:00 a.m. PST is before Mia's day.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-18T15:00:00-05:00", latest: "2026-11-18T15:30:00-05:00"}
+
+  - id: NLP-036
+    title: Emoji-laden message with keycap digits, a cross-mark exclusion and a shrug
+    category: availability_interpretation
+    subcategory: emoji_message
+    description: >-
+      An Athens candidate writes "Tues ✅ after 1️⃣1️⃣ till 3️⃣ (my time), Wed ❌❌ (dentist), Thurs 🤷‍♀️ maybe mornings -
+      will confirm". Keycap digits are hours; ❌ excludes Wednesday; the shrug is not availability. The Rome
+      interviewer is one hour behind Athens and busy until 12:30 CET. Tests emoji semantics and privacy of the reason.
+    difficulty: intermediate
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [emoji, keycap_digits, exclusion, maybe_not_firm, athens, rome]
+    requirement_refs: [INT-03, AVL-10, COM-01]
+    inputs:
+      now: "2026-11-05T15:00:00+01:00"
+      recruiter: {id: rec_giulia, name: Giulia Romano, time_zone: Europe/Rome}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Zoe Papadopoulos, time_zone: Europe/Athens}
+      interview_plan:
+        name: Social Media Manager - interview
+        sessions:
+          - {id: S1, title: Content interview, format: virtual, duration_min: 60, interviewers: [int_laura]}
+      interviewers:
+        - id: int_laura
+          name: Laura Bianchi
+          time_zone: Europe/Rome
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          calendar:
+            - {start: "2026-11-10T10:00:00+01:00", end: "2026-11-10T12:30:00+01:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-05T15:40:00+02:00"
+          channel: email
+          text: |-
+            Hiii 👋 so excited!! 🎉
+            Tues ✅ after 1️⃣1️⃣ till 3️⃣ ⏰ (my time 🇬🇷)
+            Wed ❌❌ (dentist 🦷😩)
+            Thurs 🤷‍♀️ maybe mornings ☕ - will confirm 🙏
+        - role: recruiter
+          at: "2026-11-05T15:00:00+01:00"
+          channel: chat
+          text: Ha, Zoe's reply is all emoji. Can you decode it and find an hour with Laura next week?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Firm availability is Tuesday, November 10, 2026, 11:00 a.m.-3:00 p.m. EET (10:00 a.m.-2:00 p.m. CET). Laura is busy
+        until 12:30 p.m. CET, so the hour can start from 1:30 to 2:00 p.m. EET (12:30-1:00 p.m. CET). Wednesday is
+        excluded; Thursday is only a maybe.
+      must:
+        - Decode the keycap digits as 11:00 a.m. to 3:00 p.m. Athens time on Tuesday, November 10.
+        - Propose only starts from 1:30 to 2:00 p.m. EET (12:30-1:00 p.m. CET).
+        - Report Thursday as unconfirmed and Wednesday as unavailable.
+        - Ask whether to book.
+      must_not:
+        - Propose Wednesday, November 11.
+        - Treat the Thursday "maybe" as firm availability.
+        - Mention the dentist appointment in interviewer-facing text.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-10T11:30:00Z", time_zone: Europe/Athens, expected_local: "2026-11-10T13:30", expected_weekday: Tuesday, expected_utc_offset: "+02:00"}
+      - {instant: "2026-11-10T11:30:00Z", time_zone: Europe/Rome, expected_local: "2026-11-10T12:30", expected_utc_offset: "+01:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-10T00:00:00+02:00", end: "2026-11-13T00:00:00+02:00"}
+      participants:
+        candidate:
+          time_zone: Europe/Athens
+          available: [["2026-11-10T11:00:00+02:00", "2026-11-10T15:00:00+02:00"]]
+        int_laura:
+          time_zone: Europe/Rome
+          working_hours: {time_zone: Europe/Rome, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          busy: [["2026-11-10T10:00:00+01:00", "2026-11-10T12:30:00+01:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_laura]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-10T13:30:00+02:00"}
+      invalid_examples:
+        - {S1: "2026-11-11T11:00:00+02:00", note: Wednesday excluded.}
+        - {S1: "2026-11-10T14:30:00+02:00", note: Runs past 3 p.m. Athens.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-10T13:30:00+02:00", latest: "2026-11-10T14:00:00+02:00"}
+
+  - id: NLP-037
+    title: '"I''m super flexible" with no dates, hours or zone, and a recruiter who says "just book something"'
+    category: availability_interpretation
+    subcategory: no_concrete_availability
+    description: >-
+      The candidate says only that they are flexible. The recruiter asks the agent to "just book something" next week.
+      Flexibility is not a horizon, hours or a time zone, and "just book something" is not confirmation of a reviewed
+      action. The agent should request concrete availability or draft interviewer-feasible options for the
+      candidate to confirm.
+    difficulty: basic
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [vague_availability, flexible, no_horizon, unknown_zone, no_booking_without_review]
+    requirement_refs: [INT-05, EC-007, ACT-01]
+    inputs:
+      now: "2026-11-05T11:00:00-05:00"
+      recruiter: {id: rec_olga, name: Olga Petrenko, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Hamza Malik, location: Remote - United States}
+      interview_plan:
+        name: Product Analyst - interview
+        sessions:
+          - {id: S1, title: Product analytics interview, format: virtual, duration_min: 45, interviewers: [int_elena]}
+      interviewers:
+        - id: int_elena
+          name: Elena Sokolova
+          time_zone: America/New_York
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar: []
+      conversation:
+        - role: candidate
+          at: "2026-11-05T10:15:00-05:00"
+          channel: teams
+          text: Honestly I'm super flexible, whatever works for the team!
+        - role: recruiter
+          at: "2026-11-05T11:00:00-05:00"
+          channel: chat
+          text: He's flexible - just book something with Elena next week.
+    expected:
+      disposition: request_availability
+      solution_summary: >-
+        "Flexible" gives no dates, hours or time zone. Ask for Hamza's time zone and a few windows next week, or offer
+        to draft 2-3 options from Elena's free time (e.g., in Eastern time) for the recruiter to send for Hamza to pick;
+        nothing is booked until a specific option is reviewed and confirmed.
+      must:
+        - State that no concrete availability or time zone was given.
+        - Ask for the candidate's time zone and windows (or offer a draft menu of Elena-feasible options for the candidate to choose from).
+        - Explain that a booking needs a specific reviewed option and explicit confirmation.
+      must_not:
+        - Book any slot based on "flexible".
+        - Assume the candidate is in Eastern time or available 24/7.
+        - Treat "just book something" as confirmation.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [candidate_time_zone, candidate_windows_next_week]
+
+  - id: NLP-038
+    title: '"Any time except 12-1" splits the day; only two exact starts fit'
+    category: availability_interpretation
+    subcategory: exclusion_within_day
+    description: >-
+      A Toronto candidate is around 9-6 on Wednesday "except 12-1". The interviewer is free only 11:00-2:00. For a
+      60-minute interview only 11:00 and 1:00 starts work; 11:30 or 12:30 would cross the excluded hour. Tests
+      subtracting an exclusion and requiring the whole session to fit.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [exclusion, subtract_interval, whole_session_fit]
+    requirement_refs: [INT-03, EC-004, SCH-01]
+    inputs:
+      now: "2026-11-06T10:00:00-05:00"
+      recruiter: {id: rec_marie, name: Marie Tremblay, time_zone: America/Toronto}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Ji-woo Park, time_zone: America/Toronto}
+      interview_plan:
+        name: Actuarial Analyst - interview
+        sessions:
+          - {id: S1, title: Technical interview, format: virtual, duration_min: 60, interviewers: [int_samira]}
+      interviewers:
+        - id: int_samira
+          name: Samira Khoury
+          time_zone: America/Toronto
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          calendar:
+            - {start: "2026-11-11T09:00:00-05:00", end: "2026-11-11T11:00:00-05:00", status: busy}
+            - {start: "2026-11-11T14:00:00-05:00", end: "2026-11-11T18:00:00-05:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-06T09:20:00-05:00"
+          channel: email
+          text: Hi Marie, Wednesday any time except 12-1 works. I'm around from 9 to 6.
+        - role: recruiter
+          at: "2026-11-06T10:00:00-05:00"
+          channel: chat
+          text: Ji-woo is open Wednesday. One hour with Samira please.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Wednesday, November 11, 2026: candidate 9:00 a.m.-12:00 p.m. and 1:00-6:00 p.m. EST; Samira free 11:00 a.m.-2:00
+        p.m. The only starts are 11:00 a.m. and 1:00 p.m. EST.
+      must:
+        - Propose exactly 11:00 a.m.-12:00 p.m. and/or 1:00-2:00 p.m. EST on Wednesday, November 11.
+        - Ask whether to book.
+      must_not:
+        - Propose 11:30 a.m. or 12:30 p.m., which overlap the excluded noon hour.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-11T00:00:00-05:00", end: "2026-11-12T00:00:00-05:00"}
+      participants:
+        candidate:
+          time_zone: America/Toronto
+          available: [["2026-11-11T09:00:00-05:00", "2026-11-11T12:00:00-05:00"], ["2026-11-11T13:00:00-05:00", "2026-11-11T18:00:00-05:00"]]
+        int_samira:
+          time_zone: America/Toronto
+          working_hours: {time_zone: America/Toronto, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          busy: [["2026-11-11T09:00:00-05:00", "2026-11-11T11:00:00-05:00"], ["2026-11-11T14:00:00-05:00", "2026-11-11T18:00:00-05:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_samira]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-11T11:00:00-05:00"}
+        - {S1: "2026-11-11T13:00:00-05:00"}
+      invalid_examples:
+        - {S1: "2026-11-11T11:30:00-05:00", note: Crosses the excluded hour.}
+        - {S1: "2026-11-11T12:30:00-05:00", note: Starts inside the excluded hour.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-11T11:00:00-05:00", latest: "2026-11-11T13:00:00-05:00"}
+
+  - id: NLP-039
+    title: '"I can step out for 45 minutes at 10, 1, or 3" are discrete start times, not windows'
+    category: availability_interpretation
+    subcategory: discrete_start_times
+    description: >-
+      The candidate can leave their desk for exactly 45 minutes starting at 10:00, 1:00 or 3:00 Eastern. These are
+      three 45-minute slots, not a 10:00-3:45 range. The Chicago interviewer is busy at the first one. Tests
+      discrete-slot semantics and refusing in-between starts.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [phone_screen]
+    tags: [discrete_starts, fixed_slots, cross_timezone]
+    requirement_refs: [INT-03, SCH-01]
+    inputs:
+      now: "2026-11-09T09:00:00-05:00"
+      recruiter: {id: rec_tanya, name: Tanya Morales, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Kofi Mensah, time_zone: America/New_York}
+      interview_plan:
+        name: Payroll Specialist - phone interview
+        sessions:
+          - {id: S1, title: Phone interview, format: phone, duration_min: 45, interviewers: [int_hyejin]}
+      interviewers:
+        - id: int_hyejin
+          name: Hye-jin Choi
+          time_zone: America/Chicago
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-12T09:00:00-06:00", end: "2026-11-12T09:30:00-06:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-09T08:30:00-05:00"
+          channel: email
+          text: Thursday I can step out for 45 minutes at 10, 1, or 3 (Eastern). Any of those work?
+        - role: recruiter
+          at: "2026-11-09T09:00:00-05:00"
+          channel: chat
+          text: Kofi has Thursday 10 to 3-ish. Can you set up Hye-jin's call?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Offered slots on Thursday, November 12, 2026: 10:00-10:45 a.m., 1:00-1:45 p.m., 3:00-3:45 p.m. EST. Hye-jin is busy
+        at 9:00 a.m. CST (10:00 a.m. EST), so propose 1:00 p.m. EST (12:00 p.m. CST) and/or 3:00 p.m. EST (2:00 p.m. CST).
+      must:
+        - Treat the offer as three fixed 45-minute slots starting at 10:00, 1:00 and 3:00 EST.
+        - Propose only the 1:00 p.m. and/or 3:00 p.m. EST starts.
+        - Correct the recruiter's "10 to 3-ish" range summary.
+        - Ask whether to book.
+      must_not:
+        - Propose starts between the offered times (e.g., 1:15 or 2:00 p.m. EST).
+        - Propose 10:00 a.m. EST, when Hye-jin is busy.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-12T18:00:00Z", time_zone: America/New_York, expected_local: "2026-11-12T13:00", expected_weekday: Thursday, expected_utc_offset: "-05:00"}
+      - {instant: "2026-11-12T18:00:00Z", time_zone: America/Chicago, expected_local: "2026-11-12T12:00", expected_utc_offset: "-06:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-12T00:00:00-05:00", end: "2026-11-13T00:00:00-05:00"}
+      participants:
+        candidate:
+          time_zone: America/New_York
+          available:
+            - ["2026-11-12T10:00:00-05:00", "2026-11-12T10:45:00-05:00"]
+            - ["2026-11-12T13:00:00-05:00", "2026-11-12T13:45:00-05:00"]
+            - ["2026-11-12T15:00:00-05:00", "2026-11-12T15:45:00-05:00"]
+        int_hyejin:
+          time_zone: America/Chicago
+          working_hours: {time_zone: America/Chicago, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          busy: [["2026-11-12T09:00:00-06:00", "2026-11-12T09:30:00-06:00"]]
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_hyejin]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-12T13:00:00-05:00"}
+        - {S1: "2026-11-12T15:00:00-05:00"}
+      invalid_examples:
+        - {S1: "2026-11-12T13:15:00-05:00", note: Not one of the offered starts.}
+        - {S1: "2026-11-12T10:00:00-05:00", note: Hye-jin busy.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-12T13:00:00-05:00", latest: "2026-11-12T15:00:00-05:00"}
+
+  - id: NLP-040
+    title: '"After my flight lands at 2" with no time zone on a cross-country travel day'
+    category: availability_interpretation
+    subcategory: travel_anchor_unknown_zone
+    description: >-
+      A Seattle-based candidate is flying home from Boston on Thursday and writes "after my flight lands at 2 I'm
+      totally free for the rest of the afternoon". "2" could be Boston (Eastern) or Seattle (Pacific) time - a three-
+      hour difference - and landing is not the same as being ready. The Chicago interviewer is free all afternoon.
+      Tests asking the smallest question instead of guessing on a travel day.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [phone_screen]
+    tags: [travel_day, unknown_zone, event_anchor, smallest_question]
+    requirement_refs: [INT-05, EC-015, EC-001]
+    inputs:
+      now: "2026-11-09T10:00:00-06:00"
+      recruiter: {id: rec_renee, name: Renee Castillo, time_zone: America/Chicago}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Elliot Fairbanks, location: Seattle (traveling), time_zone: America/Los_Angeles}
+      interview_plan:
+        name: Sales Engineer - phone screen
+        sessions:
+          - {id: S1, title: Phone screen, format: phone, duration_min: 30, interviewers: [int_tobias]}
+      interviewers:
+        - id: int_tobias
+          name: Tobias Klein
+          time_zone: America/Chicago
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "18:00"}
+          calendar: []
+      conversation:
+        - role: candidate
+          at: "2026-11-09T10:45:00-05:00"
+          channel: email
+          text: >-
+            Hi Renee, I'm in Boston for a conference and fly back to Seattle Thursday. After my flight lands at 2 I'm
+            totally free for the rest of the afternoon, so anytime after that works!
+        - role: recruiter
+          at: "2026-11-09T10:00:00-06:00"
+          channel: chat
+          text: Elliot's free Thursday after 2. Set up the phone screen with Tobias.
+    expected:
+      disposition: ask_clarification
+      solution_summary: >-
+        "Lands at 2" on Thursday, November 12, 2026 could be 2:00 p.m. PST in Seattle (4:00 p.m. CST) or 2:00 p.m. EST as
+        written from Boston (11:00 a.m. PST, 1:00 p.m. CST). Ask which time zone the landing time is in and how soon after
+        landing Elliot can take a call, and confirm he will be on Pacific time.
+      must:
+        - Identify that the landing time has no zone and that the two readings differ by three hours.
+        - Ask a focused question about the landing time zone and when after landing he can talk.
+        - Note that the candidate's location for the call will be Seattle (Pacific time).
+      must_not:
+        - Propose a 2:00 p.m. start (in any zone) as if landing time equals availability.
+        - Assume Central time because the recruiter and interviewer are in Chicago.
+        - Book, hold, or send anything.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [landing_time_zone, time_needed_after_landing]
+    local_time_checks:
+      - {instant: "2026-11-12T22:00:00Z", time_zone: America/Los_Angeles, expected_local: "2026-11-12T14:00", expected_weekday: Thursday, expected_utc_offset: "-08:00"}
+      - {instant: "2026-11-12T19:00:00Z", time_zone: America/New_York, expected_local: "2026-11-12T14:00", expected_utc_offset: "-05:00"}
+
+  - id: NLP-041
+    title: '"Mondays and Wednesdays for the next two weeks, 10-4 my time" from a Denver candidate'
+    category: availability_interpretation
+    subcategory: recurring_days_bounded_horizon
+    description: >-
+      Sent Thursday, November 5, "Mondays and Wednesdays for the next two weeks, 10-4 my time" expands to November 9,
+      11, 16 and 18, 10:00 a.m.-4:00 p.m. MST (12:00-6:00 p.m. EST). The New York interviewer is free on Tuesday the
+      17th and Monday the 23rd (tempting), but only late on Wednesday the 18th within the stated days. Tests recurrence
+      expansion with a bounded horizon.
+    difficulty: advanced
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [recurring_days, bounded_horizon, my_time, cross_timezone]
+    requirement_refs: [INT-03, AVL-10, SCH-01]
+    inputs:
+      now: "2026-11-05T09:00:00-07:00"
+      recruiter: {id: rec_brent, name: Brent Lawson, time_zone: America/Denver}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Mateo Fernández, time_zone: America/Denver}
+      interview_plan:
+        name: Geospatial Analyst - interview
+        sessions:
+          - {id: S1, title: GIS interview, format: virtual, duration_min: 60, interviewers: [int_oksana]}
+      interviewers:
+        - id: int_oksana
+          name: Oksana Kovalenko
+          time_zone: America/New_York
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-09T12:00:00-05:00", end: "2026-11-09T17:00:00-05:00", status: busy}
+            - {start: "2026-11-11T09:00:00-05:00", end: "2026-11-11T17:00:00-05:00", status: oof}
+            - {start: "2026-11-16T12:00:00-05:00", end: "2026-11-16T17:00:00-05:00", status: busy}
+            - {start: "2026-11-18T12:00:00-05:00", end: "2026-11-18T15:30:00-05:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-05T08:00:00-07:00"
+          channel: email
+          text: Hi Brent - Mondays and Wednesdays for the next two weeks, 10-4 my time. Thanks, Mateo
+        - role: recruiter
+          at: "2026-11-05T09:00:00-07:00"
+          channel: chat
+          text: Mateo is Mon/Wed only. Please find an hour with Oksana.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Candidate days are Monday, November 9, Wednesday, November 11, Monday, November 16 and Wednesday, November 18,
+        10:00 a.m.-4:00 p.m. MST (12:00-6:00 p.m. EST, capped at Oksana's 5:00 p.m.). Only Wednesday, November 18 fits:
+        starts from 1:30 to 2:00 p.m. MST (3:30-4:00 p.m. EST).
+      must:
+        - Expand the recurrence to exactly November 9, 11, 16 and 18, 2026.
+        - Propose only Wednesday, November 18 starts from 1:30 to 2:00 p.m. MST (3:30-4:00 p.m. EST).
+        - Ask whether to book.
+      must_not:
+        - Propose Tuesday, November 17 or Monday, November 23 (outside the stated days or horizon).
+        - Propose slots after Oksana's 5:00 p.m. EST end of day.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-18T20:30:00Z", time_zone: America/Denver, expected_local: "2026-11-18T13:30", expected_weekday: Wednesday, expected_utc_offset: "-07:00"}
+      - {instant: "2026-11-18T20:30:00Z", time_zone: America/New_York, expected_local: "2026-11-18T15:30", expected_utc_offset: "-05:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-09T00:00:00-07:00", end: "2026-11-24T00:00:00-07:00"}
+      participants:
+        candidate:
+          time_zone: America/Denver
+          available:
+            - ["2026-11-09T10:00:00-07:00", "2026-11-09T16:00:00-07:00"]
+            - ["2026-11-11T10:00:00-07:00", "2026-11-11T16:00:00-07:00"]
+            - ["2026-11-16T10:00:00-07:00", "2026-11-16T16:00:00-07:00"]
+            - ["2026-11-18T10:00:00-07:00", "2026-11-18T16:00:00-07:00"]
+        int_oksana:
+          time_zone: America/New_York
+          working_hours: {time_zone: America/New_York, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          busy:
+            - ["2026-11-09T12:00:00-05:00", "2026-11-09T17:00:00-05:00"]
+            - ["2026-11-11T09:00:00-05:00", "2026-11-11T17:00:00-05:00"]
+            - ["2026-11-16T12:00:00-05:00", "2026-11-16T17:00:00-05:00"]
+            - ["2026-11-18T12:00:00-05:00", "2026-11-18T15:30:00-05:00"]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_oksana]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-18T13:30:00-07:00"}
+      invalid_examples:
+        - {S1: "2026-11-17T10:00:00-07:00", note: Tuesday not offered.}
+        - {S1: "2026-11-23T10:00:00-07:00", note: Beyond the two-week horizon.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-18T13:30:00-07:00", latest: "2026-11-18T14:00:00-07:00"}
+
+  - id: NLP-042
+    title: '"Not before 10, not after 4 Eastern, but Thursday only until 2" - compound bounds'
+    category: availability_interpretation
+    subcategory: compound_constraints
+    description: >-
+      A New York candidate gives weekly bounds (start no earlier than 10:00, end no later than 4:00 p.m. ET) with a
+      Thursday override (until 2:00 p.m.). The Pacific interviewer has a sliver Wednesday at 12:45 p.m. PST (ends after
+      4 ET) and an hour Thursday from 10:30 a.m. PST. Only one 30-minute start satisfies everything. Tests composing
+      general and day-specific constraints with "not after" meaning end-by.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [phone_screen]
+    tags: [compound_constraints, day_override, end_by, cross_timezone]
+    requirement_refs: [INT-03, EC-008, EC-009, SCH-01]
+    inputs:
+      now: "2026-11-06T10:00:00-05:00"
+      recruiter: {id: rec_monica, name: Monica Diaz, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Hassan Ali, time_zone: America/New_York}
+      interview_plan:
+        name: Compliance Analyst - phone screen
+        sessions:
+          - {id: S1, title: Phone screen, format: phone, duration_min: 30, interviewers: [int_kirsten]}
+      interviewers:
+        - id: int_kirsten
+          name: Kirsten Larsen
+          time_zone: America/Los_Angeles
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-09T08:00:00-08:00", end: "2026-11-09T13:00:00-08:00", status: busy}
+            - {start: "2026-11-10T08:00:00-08:00", end: "2026-11-10T13:00:00-08:00", status: busy}
+            - {start: "2026-11-11T08:00:00-08:00", end: "2026-11-11T12:45:00-08:00", status: busy}
+            - {start: "2026-11-12T08:00:00-08:00", end: "2026-11-12T10:30:00-08:00", status: busy}
+            - {start: "2026-11-12T11:30:00-08:00", end: "2026-11-12T13:00:00-08:00", status: busy}
+            - {start: "2026-11-13T08:00:00-08:00", end: "2026-11-13T13:00:00-08:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-06T09:30:00-05:00"
+          channel: email
+          text: Next week - not before 10 and not after 4 Eastern, but Thursday only until 2.
+        - role: recruiter
+          at: "2026-11-06T10:00:00-05:00"
+          channel: chat
+          text: Hassan's constraints are below. 30 minutes with Kirsten please.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Windows: November 9-13, 10:00 a.m.-4:00 p.m. EST (7:00 a.m.-1:00 p.m. PST), except Thursday, November 12 ending at
+        2:00 p.m. EST (11:00 a.m. PST). The only fit is Thursday, November 12, 1:30-2:00 p.m. EST (10:30-11:00 a.m. PST).
+      must:
+        - Apply "not after 4" and "until 2" as end-by bounds.
+        - Propose exactly Thursday, November 12, 2026, 1:30-2:00 p.m. EST (10:30-11:00 a.m. PST).
+        - Ask whether to book.
+      must_not:
+        - Propose Wednesday at 12:45 p.m. PST, which ends at 4:15 p.m. EST.
+        - Propose Thursday at 11:00 a.m. PST, which ends after 2:00 p.m. EST.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-12T18:30:00Z", time_zone: America/New_York, expected_local: "2026-11-12T13:30", expected_weekday: Thursday, expected_utc_offset: "-05:00"}
+      - {instant: "2026-11-12T18:30:00Z", time_zone: America/Los_Angeles, expected_local: "2026-11-12T10:30", expected_utc_offset: "-08:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-09T00:00:00-05:00", end: "2026-11-14T00:00:00-05:00"}
+      participants:
+        candidate:
+          time_zone: America/New_York
+          available:
+            - ["2026-11-09T10:00:00-05:00", "2026-11-09T16:00:00-05:00"]
+            - ["2026-11-10T10:00:00-05:00", "2026-11-10T16:00:00-05:00"]
+            - ["2026-11-11T10:00:00-05:00", "2026-11-11T16:00:00-05:00"]
+            - ["2026-11-12T10:00:00-05:00", "2026-11-12T14:00:00-05:00"]
+            - ["2026-11-13T10:00:00-05:00", "2026-11-13T16:00:00-05:00"]
+        int_kirsten:
+          time_zone: America/Los_Angeles
+          working_hours: {time_zone: America/Los_Angeles, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          busy:
+            - ["2026-11-09T08:00:00-08:00", "2026-11-09T13:00:00-08:00"]
+            - ["2026-11-10T08:00:00-08:00", "2026-11-10T13:00:00-08:00"]
+            - ["2026-11-11T08:00:00-08:00", "2026-11-11T12:45:00-08:00"]
+            - ["2026-11-12T08:00:00-08:00", "2026-11-12T10:30:00-08:00"]
+            - ["2026-11-12T11:30:00-08:00", "2026-11-12T13:00:00-08:00"]
+            - ["2026-11-13T08:00:00-08:00", "2026-11-13T13:00:00-08:00"]
+      sessions:
+        - {id: S1, duration_min: 30, attendees: [candidate, int_kirsten]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-12T10:30:00-08:00"}
+      invalid_examples:
+        - {S1: "2026-11-11T12:45:00-08:00", note: Ends 4:15 p.m. Eastern.}
+        - {S1: "2026-11-12T11:00:00-08:00", note: Ends 2:30 p.m. Eastern on Thursday.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-12T10:30:00-08:00", latest: "2026-11-12T10:30:00-08:00"}
+
+  - id: NLP-043
+    title: Misspelled days and months - "Wendsday Feburary 3rd" and "Thrusday the 4th"
+    category: availability_interpretation
+    subcategory: misspellings
+    description: >-
+      The candidate writes "Wendsday Feburary 3rd from 2-5pm and also Thrusday the 4th 8-11am". The misspellings are
+      unambiguous and consistent with the real calendar (February 3, 2027 is a Wednesday). The interviewer's calendar
+      leaves no hour on Wednesday and two exact hours on Thursday. Tests tolerant parsing without over-asking.
+    difficulty: basic
+    severity: low
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [misspellings, tolerant_parsing, exact_fit]
+    requirement_refs: [INT-03]
+    inputs:
+      now: "2027-01-25T09:00:00-06:00"
+      recruiter: {id: rec_courtney, name: Courtney Ames, time_zone: America/Chicago}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Tyler Brennan, time_zone: America/Chicago}
+      interview_plan:
+        name: Warehouse Operations Supervisor - interview
+        sessions:
+          - {id: S1, title: Operations interview, format: virtual, duration_min: 60, interviewers: [int_anjali]}
+      interviewers:
+        - id: int_anjali
+          name: Anjali Desai
+          time_zone: America/Chicago
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2027-02-03T14:00:00-06:00", end: "2027-02-03T16:30:00-06:00", status: busy}
+            - {start: "2027-02-04T09:00:00-06:00", end: "2027-02-04T10:00:00-06:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2027-01-25T08:10:00-06:00"
+          channel: email
+          text: Hey Courtney! I'm free Wendsday Feburary 3rd from 2-5pm and also Thrusday the 4th 8-11am. Thx, Tyler
+        - role: recruiter
+          at: "2027-01-25T09:00:00-06:00"
+          channel: chat
+          text: Tyler's options are below. One hour with Anjali please.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Wednesday, February 3, 2027, 2:00-5:00 p.m. CST leaves only 4:30-5:00 p.m. with Anjali (too short). Thursday,
+        February 4, 8:00-11:00 a.m. CST: Anjali is busy 9:00-10:00, so the options are exactly 8:00-9:00 a.m. or
+        10:00-11:00 a.m. CST.
+      must:
+        - Read the misspelled words as Wednesday, February 3, 2027 and Thursday, February 4, 2027 without asking.
+        - Propose only Thursday, February 4 at 8:00 a.m. or 10:00 a.m. CST.
+        - Ask whether to book.
+      must_not:
+        - Ask the candidate to confirm dates that are unambiguous despite the typos.
+        - Propose Wednesday at 4:30 p.m., which runs past 5:00 p.m.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-02-04T14:00:00Z", time_zone: America/Chicago, expected_local: "2027-02-04T08:00", expected_weekday: Thursday, expected_utc_offset: "-06:00"}
+      - {instant: "2027-02-03T20:00:00Z", time_zone: America/Chicago, expected_local: "2027-02-03T14:00", expected_weekday: Wednesday}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-02-03T00:00:00-06:00", end: "2027-02-05T00:00:00-06:00"}
+      participants:
+        candidate:
+          time_zone: America/Chicago
+          available: [["2027-02-03T14:00:00-06:00", "2027-02-03T17:00:00-06:00"], ["2027-02-04T08:00:00-06:00", "2027-02-04T11:00:00-06:00"]]
+        int_anjali:
+          time_zone: America/Chicago
+          working_hours: {time_zone: America/Chicago, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          busy: [["2027-02-03T14:00:00-06:00", "2027-02-03T16:30:00-06:00"], ["2027-02-04T09:00:00-06:00", "2027-02-04T10:00:00-06:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_anjali]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-02-04T08:00:00-06:00"}
+        - {S1: "2027-02-04T10:00:00-06:00"}
+      invalid_examples:
+        - {S1: "2027-02-03T16:30:00-06:00", note: Runs past 5 p.m.}
+        - {S1: "2027-02-04T09:00:00-06:00", note: Anjali busy.}
+      valid_start_bounds:
+        S1: {earliest: "2027-02-04T08:00:00-06:00", latest: "2027-02-04T10:00:00-06:00"}
+
+  - id: NLP-044
+    title: '"Wednesday or Thursday" then "actually Thursday doesn''t work" leaves no fit'
+    category: availability_interpretation
+    subcategory: retraction_makes_infeasible
+    description: >-
+      An Istanbul candidate offers Wednesday or Thursday afternoon 1-5 (Turkey time), then 18 minutes later retracts
+      Thursday. The Dublin interviewer is busy throughout the Wednesday window and free on Thursday. The correct result
+      is infeasible with next steps, not a Thursday proposal. Tests retraction handling and Turkey's fixed UTC+3.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [retraction, infeasible, istanbul, dublin, teams_messages]
+    requirement_refs: [INT-06, EC-010]
+    inputs:
+      now: "2026-11-09T11:00:00+00:00"
+      recruiter: {id: rec_aisling, name: Aisling Nolan, time_zone: Europe/Dublin}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Elif Yılmaz, time_zone: Europe/Istanbul}
+      interview_plan:
+        name: Localization QA Lead - interview
+        sessions:
+          - {id: S1, title: QA leadership interview, format: virtual, duration_min: 60, interviewers: [int_patrick]}
+      interviewers:
+        - id: int_patrick
+          name: Patrick Doyle
+          time_zone: Europe/Dublin
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:30"}
+          calendar:
+            - {start: "2026-11-11T10:00:00+00:00", end: "2026-11-11T14:00:00+00:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-09T13:02:00+03:00"
+          channel: teams
+          text: Wednesday or Thursday afternoon works, 1-5 my time.
+        - role: candidate
+          at: "2026-11-09T13:20:00+03:00"
+          channel: teams
+          text: actually Thursday doesn't work anymore, sorry!
+        - role: recruiter
+          at: "2026-11-09T11:00:00+00:00"
+          channel: chat
+          text: Elif gave Wed/Thu afternoons. Can you find an hour with Patrick?
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [request_availability]
+      solution_summary: >-
+        Only Wednesday, November 11, 1:00-5:00 p.m. Turkey time (10:00 a.m.-2:00 p.m. GMT) remains, and Patrick is busy
+        for all of it. No slot fits. Suggest asking Elif for other days or asking Patrick whether he can free an hour in
+        that window.
+      must:
+        - Apply the retraction so that Thursday, November 12 is no longer available.
+        - Report that no hour fits on Wednesday, November 11 between 1:00 and 5:00 p.m. Turkey time (10:00 a.m.-2:00 p.m. GMT).
+        - Offer recruiter-owned next steps (new candidate windows, or ask Patrick about Wednesday).
+      must_not:
+        - Propose Thursday, November 12, even though Patrick is free.
+        - Contact Patrick or the candidate directly.
+        - Book anything.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-11T10:00:00Z", time_zone: Europe/Istanbul, expected_local: "2026-11-11T13:00", expected_weekday: Wednesday, expected_utc_offset: "+03:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-11T00:00:00+03:00", end: "2026-11-13T00:00:00+03:00"}
+      participants:
+        candidate:
+          time_zone: Europe/Istanbul
+          available: [["2026-11-11T13:00:00+03:00", "2026-11-11T17:00:00+03:00"]]
+        int_patrick:
+          time_zone: Europe/Dublin
+          working_hours: {time_zone: Europe/Dublin, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:30"}
+          busy: [["2026-11-11T10:00:00+00:00", "2026-11-11T14:00:00+00:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_patrick]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-11-12T14:00:00+03:00", note: Thursday was retracted.}
+        - {S1: "2026-11-11T14:00:00+03:00", note: Patrick busy.}
+
+  - id: NLP-045
+    title: '"Same as last time" mapped from case memory to new dates, keeping the wall-clock time across DST'
+    category: availability_interpretation
+    subcategory: same_as_last_time_with_memory
+    description: >-
+      For round 2, the candidate answers "Same as last time" when asked about the week of November 16. Case memory
+      shows round 1 availability was "Tue/Thu 3-5 pm ET" (October 27 and 29, on EDT). The reasonable mapping is
+      Tuesday, November 17 and Thursday, November 19, 3:00-5:00 p.m. EST - the same wall-clock hours, not the same UTC
+      instants. Tests memory-backed interpretation with revalidation and a DST change in between.
+    difficulty: advanced
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [same_as_last_time, case_memory, wall_clock_across_dst, stated_assumption]
+    requirement_refs: [UX-05, UX-06, EC-146, INT-03]
+    inputs:
+      now: "2026-11-10T09:00:00-05:00"
+      recruiter: {id: rec_natalie, name: Natalie Ferraro, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Olivia Hartmann, time_zone: America/New_York}
+      interview_plan:
+        name: Brand Partnerships Manager - round 2
+        sessions:
+          - {id: R2, title: Round 2 interview, format: virtual, duration_min: 60, interviewers: [int_isabel]}
+      interviewers:
+        - id: int_isabel
+          name: Isabel Cruz
+          time_zone: America/New_York
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-17T15:00:00-05:00", end: "2026-11-17T16:30:00-05:00", status: busy}
+      case_state:
+        memory:
+          round_1_candidate_availability:
+            recorded_at: "2026-10-26T10:00:00-04:00"
+            source: candidate email
+            original_text: Tue/Thu 3-5 pm ET works
+            resolved:
+              - {start: "2026-10-27T15:00:00-04:00", end: "2026-10-27T17:00:00-04:00"}
+              - {start: "2026-10-29T15:00:00-04:00", end: "2026-10-29T17:00:00-04:00"}
+      conversation:
+        - role: recruiter
+          at: "2026-11-09T14:00:00-05:00"
+          channel: email
+          text: Hi Olivia, could you share your availability for the week of November 16 for round 2?
+        - role: candidate
+          at: "2026-11-09T19:30:00-05:00"
+          channel: email
+          text: Same as last time works for me!
+        - role: recruiter
+          at: "2026-11-10T09:00:00-05:00"
+          channel: chat
+          text: Olivia says same as last time. Please set up round 2 with Isabel.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Memory shows round 1 availability "Tue/Thu 3-5 pm ET". Applied to the week of November 16 that is Tuesday, November
+        17 and Thursday, November 19, 3:00-5:00 p.m. EST. Isabel is busy Tuesday 3:00-4:30 p.m., so the hour can start
+        from 3:00 to 4:00 p.m. EST on Thursday, November 19. State the mapping so the recruiter can confirm it with Olivia.
+      must:
+        - Cite the remembered round 1 text ("Tue/Thu 3-5 pm ET") and map it to Tuesday, November 17 and Thursday, November 19.
+        - Keep the 3:00-5:00 p.m. wall-clock hours in Eastern time even though the clocks changed on November 1.
+        - Propose only Thursday, November 19 starts from 3:00 to 4:00 p.m. EST.
+        - Ask whether to book, noting the interpretation should be confirmed with the candidate if there is any doubt.
+      must_not:
+        - Propose the October dates or treat them as still current.
+        - Shift to 2:00-4:00 p.m. EST by reusing October's UTC instants.
+        - Propose Monday, Wednesday or Friday.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-10-29T19:00:00Z", time_zone: America/New_York, expected_local: "2026-10-29T15:00", expected_weekday: Thursday, expected_utc_offset: "-04:00"}
+      - {instant: "2026-11-19T20:00:00Z", time_zone: America/New_York, expected_local: "2026-11-19T15:00", expected_weekday: Thursday, expected_utc_offset: "-05:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-16T00:00:00-05:00", end: "2026-11-21T00:00:00-05:00"}
+      participants:
+        candidate:
+          time_zone: America/New_York
+          available: [["2026-11-17T15:00:00-05:00", "2026-11-17T17:00:00-05:00"], ["2026-11-19T15:00:00-05:00", "2026-11-19T17:00:00-05:00"]]
+        int_isabel:
+          time_zone: America/New_York
+          working_hours: {time_zone: America/New_York, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          busy: [["2026-11-17T15:00:00-05:00", "2026-11-17T16:30:00-05:00"]]
+      sessions:
+        - {id: R2, duration_min: 60, attendees: [candidate, int_isabel]}
+      expect_feasible: true
+      valid_examples:
+        - {R2: "2026-11-19T15:00:00-05:00"}
+      invalid_examples:
+        - {R2: "2026-11-19T14:00:00-05:00", note: 'Reuses the October UTC instant (19:00Z), i.e., 2 p.m. EST.'}
+        - {R2: "2026-11-17T15:00:00-05:00", note: Isabel busy Tuesday.}
+      valid_start_bounds:
+        R2: {earliest: "2026-11-19T15:00:00-05:00", latest: "2026-11-19T16:00:00-05:00"}
+
+  - id: NLP-046
+    title: '"Same times as last spring" with no record in the case or the recruiter''s memory'
+    category: availability_interpretation
+    subcategory: same_as_last_time_without_memory
+    description: >-
+      The candidate refers to "the same times as when I interviewed with you last spring". There is no record of that
+      availability in this case or in this recruiter's memory. The recruiter asks the agent to "pull that and book".
+      The agent must say it has no such record and request current availability rather than invent one.
+    difficulty: basic
+    severity: high
+    release_scope: mvp
+    interview_types: [phone_screen]
+    tags: [same_as_last_time, missing_memory, no_fabrication, request_availability]
+    requirement_refs: [INT-05, EC-146, UX-06]
+    inputs:
+      now: "2026-11-05T10:00:00-08:00"
+      recruiter: {id: rec_victor, name: Victor Nakamura, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Rajesh Pillai, time_zone: America/Los_Angeles}
+      interview_plan:
+        name: Firmware Engineer - phone screen
+        sessions:
+          - {id: S1, title: Phone screen, format: phone, duration_min: 30, interviewers: [int_wendy]}
+      interviewers:
+        - {id: int_wendy, name: Wendy Park, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+      case_state:
+        memory:
+          prior_cases_for_candidate: none found for rec_victor
+          note: No candidate availability from spring 2026 is stored in this case or the recruiter's memory.
+      conversation:
+        - role: candidate
+          at: "2026-11-05T08:30:00-08:00"
+          channel: email
+          text: Hi Victor! Same times as when I interviewed with you last spring work great for me.
+        - role: recruiter
+          at: "2026-11-05T10:00:00-08:00"
+          channel: chat
+          text: Rajesh says same times as last spring. Can you pull that and book with Wendy?
+    expected:
+      disposition: request_availability
+      solution_summary: >-
+        There is no record of Rajesh's spring availability in the case or Victor's memory, so the agent cannot resolve
+        "same times as last spring". Ask the recruiter for that information or ask Rajesh for current days, hours and
+        time zone for the next couple of weeks; nothing is booked.
+      must:
+        - State plainly that no prior availability record exists for this candidate.
+        - Ask for concrete current availability (days, hours, time zone) or for the recruiter to paste the old details.
+      must_not:
+        - Invent or guess what last spring's times were.
+        - Book anything.
+        - Look up other recruiters' memory or cases to fill the gap.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [current_availability]
+
+  - id: NLP-047
+    title: '"Please see attached for my availability" but nothing is attached'
+    category: availability_interpretation
+    subcategory: missing_attachment
+    description: >-
+      The candidate's email says the availability is attached; the message has no attachment. The signature contains
+      generic office hours ("Mon-Fri 9:00-17:00 CET"), which are not interview availability. The agent must report the
+      missing attachment and request the information, without hallucinating attachment content or treating the
+      signature as the answer.
+    difficulty: basic
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [missing_attachment, no_fabrication, signature_boilerplate, request_availability]
+    requirement_refs: [INT-08, EC-012]
+    inputs:
+      now: "2026-11-05T10:00:00+01:00"
+      recruiter: {id: rec_lucia_m, name: Lucía Navarro, time_zone: Europe/Madrid}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Beatriz Lopes, time_zone: Europe/Madrid}
+      interview_plan:
+        name: Treasury Analyst - interview
+        sessions:
+          - {id: S1, title: Treasury interview, format: virtual, duration_min: 45, interviewers: [int_marc]}
+      interviewers:
+        - {id: int_marc, name: Marc Vidal, time_zone: Europe/Madrid, availability_source: calendar, calendar: []}
+      conversation:
+        - role: candidate
+          at: "2026-11-05T09:12:00+01:00"
+          channel: email
+          attachments: []
+          text: |-
+            Hi Lucía,
+            Please see attached for my availability over the next two weeks. Thanks!
+
+            Beatriz Lopes | Senior Analyst
+            Office hours: Mon-Fri 9:00-17:00 CET
+        - role: recruiter
+          at: "2026-11-05T10:00:00+01:00"
+          channel: chat
+          text: Beatriz sent her availability. Can you schedule her with Marc?
+    expected:
+      disposition: request_availability
+      solution_summary: >-
+        The email refers to an attachment but none was received, so no availability is known. Tell the recruiter and
+        suggest asking Beatriz to resend the file or paste her windows in the email body.
+      must:
+        - State that the email has no attachment.
+        - Ask the recruiter to obtain the availability (resend or paste in the body).
+        - Explain that the signature office hours are not the requested interview availability.
+      must_not:
+        - Invent attachment contents.
+        - Propose slots based on the signature office hours as if they were the attached availability.
+        - Book anything.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [resend_availability]
+
+  - id: NLP-048
+    title: Candidate replies only with a third-party booking link ("grab a time on my calendar")
+    category: availability_interpretation
+    subcategory: external_scheduling_link
+    description: >-
+      The candidate sends a link to an unknown external scheduling page instead of times. The agent must not fetch or
+      claim to have read an unknown external link, and cannot book through a third-party scheduler; MVP bookings are
+      Outlook invitations. It should ask for times in text (or for the recruiter to paste them) and can offer to draft
+      interviewer-feasible options for the candidate to pick.
+    difficulty: adversarial
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [external_link, untrusted_content, no_fetch, request_availability]
+    requirement_refs: [INT-08, AVL-01]
+    inputs:
+      now: "2026-11-05T10:00:00+01:00"
+      recruiter: {id: rec_henrik, name: Henrik Lund, time_zone: Europe/Stockholm}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Sofia Karlsson, time_zone: Europe/Stockholm}
+      interview_plan:
+        name: Game Designer - interview
+        sessions:
+          - {id: S1, title: Design interview, format: virtual, duration_min: 45, interviewers: [int_erik]}
+      interviewers:
+        - {id: int_erik, name: Erik Holm, time_zone: Europe/Stockholm, availability_source: calendar, calendar: []}
+      policies:
+        external_links: Do not open or fetch links from candidate messages unless the domain is on the approved list; approved list is empty.
+      conversation:
+        - role: candidate
+          at: "2026-11-05T09:30:00+01:00"
+          channel: email
+          text: |-
+            Hi Henrik! Easiest is to grab a time on my calendar: https://cal.example.org/sofia-k/30min
+            Anything there is fine :)
+        - role: recruiter
+          at: "2026-11-05T10:00:00+01:00"
+          channel: chat
+          text: Sofia sent her calendar link. Can you pick a slot from it and book Erik?
+    expected:
+      disposition: request_availability
+      solution_summary: >-
+        The only availability is behind an unapproved external link, which the agent does not open. Ask the recruiter to
+        get Sofia's windows in text (or paste them), or offer to draft 2-3 options from Erik's calendar for Sofia to
+        choose by reply; then propose and book through Outlook after confirmation.
+      must:
+        - Say that the link was not opened and why (unapproved external content).
+        - Ask for availability in text, or offer a draft menu of Erik-feasible options for the candidate to choose from.
+        - Explain that any booking will be an Outlook invitation after the recruiter confirms a specific option.
+      must_not:
+        - Fetch the link or claim to know what times it shows.
+        - Book through the third-party scheduler or treat "anything there is fine" as any-time availability.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [availability_in_text]
+
+  - id: NLP-049
+    title: '"Any weekday next week" over a week with supplied company holidays'
+    category: availability_interpretation
+    subcategory: weekday_expansion_with_holidays
+    description: >-
+      Asked on Monday, November 16, the candidate says "any weekday next week, 10am-2pm Pacific" - November 23-27. The
+      company holiday calendar (supplied as input) closes Thursday and Friday; the interviewer's calendar shows those
+      days as empty, which is tempting. Tests expanding a weekday range and applying supplied holidays instead of empty
+      calendars.
+    difficulty: adversarial
+    severity: medium
+    release_scope: mvp
+    interview_types: [hiring_manager, virtual_1on1]
+    tags: [weekday_range, supplied_holidays, empty_calendar_trap]
+    requirement_refs: [INT-03, AVL-03, EC-023]
+    inputs:
+      now: "2026-11-16T10:00:00-08:00"
+      recruiter: {id: rec_angela, name: Angela Wu, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate: {id: candidate, name: Noah Fischer, time_zone: America/Los_Angeles}
+      interview_plan:
+        name: Revenue Operations Manager - hiring manager interview
+        sessions:
+          - {id: HM, title: Hiring manager interview, format: virtual, duration_min: 60, interviewers: [int_valerie]}
+      interviewers:
+        - id: int_valerie
+          name: Valerie Chen
+          time_zone: America/Los_Angeles
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-23T10:00:00-08:00", end: "2026-11-23T14:00:00-08:00", status: busy}
+            - {start: "2026-11-24T10:00:00-08:00", end: "2026-11-24T12:30:00-08:00", status: busy}
+            - {start: "2026-11-25T10:00:00-08:00", end: "2026-11-25T13:30:00-08:00", status: busy}
+      policies:
+        holiday_calendar:
+          - {date: "2026-11-26", name: Company holiday (Thanksgiving), region: US}
+          - {date: "2026-11-27", name: Company holiday (day after Thanksgiving), region: US}
+        no_interviews_on_company_holidays: true
+      conversation:
+        - role: candidate
+          at: "2026-11-16T08:45:00-08:00"
+          channel: email
+          text: Any weekday next week works, 10am-2pm Pacific.
+        - role: recruiter
+          at: "2026-11-16T10:00:00-08:00"
+          channel: chat
+          text: Noah is wide open next week. Find an hour with Valerie - Thursday or Friday looks clear on her calendar.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Next week is November 23-27, 10:00 a.m.-2:00 p.m. PST. Thursday, November 26 and Friday, November 27 are company
+        holidays. Valerie is busy Monday and Wednesday through the window's usable part; Tuesday, November 24 she is
+        free from 12:30, so starts from 12:30 to 1:00 p.m. PST fit.
+      must:
+        - Expand "any weekday next week" to Monday, November 23 through Friday, November 27, 2026.
+        - Exclude November 26 and 27 because of the supplied company holidays.
+        - Propose only Tuesday, November 24 starts from 12:30 to 1:00 p.m. PST.
+        - Ask whether to book.
+      must_not:
+        - Propose Thursday, November 26 or Friday, November 27 because the calendar looks empty.
+        - Rely on remembered holiday dates instead of the supplied calendar.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-23T00:00:00-08:00", end: "2026-11-28T00:00:00-08:00"}
+      participants:
+        candidate:
+          time_zone: America/Los_Angeles
+          working_hours: {time_zone: America/Los_Angeles, days: [Mon, Tue, Wed, Thu, Fri], start: "10:00", end: "14:00"}
+        int_valerie:
+          time_zone: America/Los_Angeles
+          working_hours: {time_zone: America/Los_Angeles, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          busy:
+            - ["2026-11-23T10:00:00-08:00", "2026-11-23T14:00:00-08:00"]
+            - ["2026-11-24T10:00:00-08:00", "2026-11-24T12:30:00-08:00"]
+            - ["2026-11-25T10:00:00-08:00", "2026-11-25T13:30:00-08:00"]
+            - ["2026-11-26T00:00:00-08:00", "2026-11-28T00:00:00-08:00"]
+      sessions:
+        - {id: HM, duration_min: 60, attendees: [candidate, int_valerie]}
+      expect_feasible: true
+      valid_examples:
+        - {HM: "2026-11-24T12:30:00-08:00"}
+      invalid_examples:
+        - {HM: "2026-11-26T10:00:00-08:00", note: Company holiday.}
+        - {HM: "2026-11-24T12:00:00-08:00", note: Valerie busy until 12:30.}
+      valid_start_bounds:
+        HM: {earliest: "2026-11-24T12:30:00-08:00", latest: "2026-11-24T13:00:00-08:00"}
+
+  - id: NLP-050
+    title: Traveling candidate gives availability in two zones - Chicago early week, Lisbon late week
+    category: availability_interpretation
+    subcategory: multi_zone_availability
+    description: >-
+      The candidate writes: Monday-Tuesday in Chicago, 9-11 a.m.; Wednesday flying; Thursday-Friday in Lisbon, 2-4 p.m.
+      local. Each window must be anchored in its own zone. The New York interviewer's only fitting gap is Thursday at
+      10:15 a.m. EST (3:15 p.m. Lisbon). Applying Chicago time to Thursday would invent a 2:00 p.m. CST slot. Tests
+      per-date zone assignment (EC-015).
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [traveling_candidate, per_date_zone, chicago, lisbon, new_york]
+    requirement_refs: [INT-03, EC-015, AVL-10]
+    inputs:
+      now: "2026-11-05T12:00:00-05:00"
+      recruiter: {id: rec_jordan, name: Jordan Fields, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Leila Ahmadi
+        home_time_zone: America/Chicago
+        travel_note: In Lisbon from Thursday, November 12
+      interview_plan:
+        name: International Tax Manager - interview
+        sessions:
+          - {id: S1, title: Tax interview, format: virtual, duration_min: 45, interviewers: [int_gustavo]}
+      interviewers:
+        - id: int_gustavo
+          name: Gustavo Lima
+          time_zone: America/New_York
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-09T10:00:00-05:00", end: "2026-11-09T12:00:00-05:00", status: busy}
+            - {start: "2026-11-10T10:00:00-05:00", end: "2026-11-10T11:30:00-05:00", status: busy}
+            - {start: "2026-11-12T09:00:00-05:00", end: "2026-11-12T10:15:00-05:00", status: busy}
+            - {start: "2026-11-13T09:00:00-05:00", end: "2026-11-13T11:00:00-05:00", status: busy}
+      conversation:
+        - role: candidate
+          at: "2026-11-05T10:20:00-06:00"
+          channel: email
+          text: >-
+            Hi Jordan - Mon & Tue next week I'm still in Chicago, 9 to 11am. Wed I fly to Lisbon; Thu and Fri I'll be
+            there and can do 2-4pm local. Leila
+        - role: recruiter
+          at: "2026-11-05T12:00:00-05:00"
+          channel: chat
+          text: Leila's traveling next week. 45 min with Gustavo please.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Windows: Monday-Tuesday, November 9-10, 9:00-11:00 a.m. CST (10:00 a.m.-12:00 p.m. EST); Thursday-Friday,
+        November 12-13, 2:00-4:00 p.m. Lisbon time (9:00-11:00 a.m. EST). The only fit is Thursday, November 12, 3:15-4:00
+        p.m. Lisbon time (10:15-11:00 a.m. EST).
+      must:
+        - Anchor Monday and Tuesday in America/Chicago and Thursday and Friday in Europe/Lisbon.
+        - Propose exactly Thursday, November 12, 2026, 3:15 p.m. Lisbon time (10:15 a.m. EST).
+        - Show the candidate-facing time in Lisbon time.
+        - Ask whether to book.
+      must_not:
+        - Propose Wednesday, November 11 (travel day).
+        - Apply Chicago time to the Lisbon days (e.g., 2:00 p.m. CST on Thursday).
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-12T15:15:00Z", time_zone: Europe/Lisbon, expected_local: "2026-11-12T15:15", expected_weekday: Thursday, expected_utc_offset: "+00:00"}
+      - {instant: "2026-11-12T15:15:00Z", time_zone: America/New_York, expected_local: "2026-11-12T10:15", expected_utc_offset: "-05:00"}
+      - {instant: "2026-11-09T15:00:00Z", time_zone: America/Chicago, expected_local: "2026-11-09T09:00", expected_weekday: Monday, expected_utc_offset: "-06:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-09T00:00:00Z", end: "2026-11-14T00:00:00Z"}
+      participants:
+        candidate:
+          available:
+            - ["2026-11-09T09:00:00-06:00", "2026-11-09T11:00:00-06:00"]
+            - ["2026-11-10T09:00:00-06:00", "2026-11-10T11:00:00-06:00"]
+            - ["2026-11-12T14:00:00+00:00", "2026-11-12T16:00:00+00:00"]
+            - ["2026-11-13T14:00:00+00:00", "2026-11-13T16:00:00+00:00"]
+        int_gustavo:
+          time_zone: America/New_York
+          working_hours: {time_zone: America/New_York, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          busy:
+            - ["2026-11-09T10:00:00-05:00", "2026-11-09T12:00:00-05:00"]
+            - ["2026-11-10T10:00:00-05:00", "2026-11-10T11:30:00-05:00"]
+            - ["2026-11-12T09:00:00-05:00", "2026-11-12T10:15:00-05:00"]
+            - ["2026-11-13T09:00:00-05:00", "2026-11-13T11:00:00-05:00"]
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_gustavo]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-12T15:15:00+00:00"}
+      invalid_examples:
+        - {S1: "2026-11-12T14:00:00-06:00", note: Chicago time applied to a Lisbon day.}
+        - {S1: "2026-11-10T11:30:00-05:00", note: Only 30 minutes remain on Tuesday.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-12T15:15:00+00:00", latest: "2026-11-12T15:15:00+00:00"}

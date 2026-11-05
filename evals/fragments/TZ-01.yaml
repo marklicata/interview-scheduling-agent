@@ -1,0 +1,2172 @@
+# Cross-timezone cases, part 1: DST transitions, mismatch weeks, gaps and folds.
+# All conversions computed with Python zoneinfo.
+test_cases:
+  - id: TZ-001
+    title: US/EU mismatch week makes an 8 a.m. Pacific screen fit Berlin hours on Mar 16 but not Mar 30
+    category: cross_timezone
+    subcategory: dst_mismatch_window
+    description: >-
+      Los Angeles has moved to PDT on March 14, 2027 but Berlin stays on CET until March 28, so for two weeks
+      the gap is 8 hours instead of 9. The candidate can only talk 8:00-9:00 a.m. Pacific before work. That
+      fits the Berlin interviewer's 9-17 day on Tuesday, March 16 (4:00-5:00 p.m. CET) but not on Tuesday,
+      March 30 (5:00-6:00 p.m. CEST). A fixed 9-hour assumption wrongly rejects March 16; a fixed 8-hour
+      assumption wrongly accepts March 30.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [phone_screen, hiring_manager]
+    tags: [dst_mismatch, los_angeles, berlin, fixed_offset_trap, working_hours_boundary]
+    requirement_refs: [AVL-10, SCH-01, EC-019]
+    inputs:
+      now: "2027-03-08T10:00:00-08:00"
+      recruiter: {id: rec_dana, name: Dana Whitfield, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Marisol Duarte
+        time_zone: America/Los_Angeles
+        availability:
+          - {start: "2027-03-16T08:00:00-07:00", end: "2027-03-16T09:00:00-07:00"}
+          - {start: "2027-03-30T08:00:00-07:00", end: "2027-03-30T09:00:00-07:00"}
+      interview_plan:
+        name: Field Applications Engineer - hiring manager phone screen
+        region: EMEA hiring team, US candidate
+        sessions:
+          - {id: S1, title: Hiring manager phone screen, format: phone, duration_min: 30, interviewers: [int_jonas]}
+      interviewers:
+        - id: int_jonas
+          name: Jonas Becker
+          time_zone: Europe/Berlin
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar: []
+      conversation:
+        - role: recruiter
+          text: >-
+            Marisol can only do 8-9am our time (Pacific) on Tue 3/16 or Tue 3/30 before her shift. Jonas is in
+            Berlin and won't take calls after 5pm his time. Berlin is 9 hours ahead so I doubt either works?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, March 16, 2027 works: any 30-minute start from 8:00 to 8:30 a.m. PDT (4:00-4:30 p.m. CET).
+        Tuesday, March 30 does not work because 8:00 a.m. PDT is 5:00 p.m. CEST, the end of Jonas's day.
+      must:
+        - Propose only March 16 starts from 8:00 to 8:30 a.m. PDT, shown as 4:00-4:30 p.m. CET for Jonas.
+        - Explain that Berlin is 8 hours ahead of Los Angeles from March 14 to March 27, 2027, and 9 hours ahead again from March 28.
+        - State that March 30 does not fit because 8:00-9:00 a.m. PDT is 5:00-6:00 p.m. CEST.
+        - Correct the recruiter's fixed 9-hour assumption politely.
+        - Ask whether to book the chosen March 16 option.
+      must_not:
+        - Say neither date works because of a fixed 9-hour difference.
+        - Propose any March 30 time.
+        - Book or send anything before explicit confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-16T15:00:00Z", time_zone: America/Los_Angeles, expected_local: "2027-03-16T08:00", expected_weekday: Tuesday, expected_utc_offset: "-07:00"}
+      - {instant: "2027-03-16T15:00:00Z", time_zone: Europe/Berlin, expected_local: "2027-03-16T16:00", expected_utc_offset: "+01:00"}
+      - {instant: "2027-03-30T15:00:00Z", time_zone: Europe/Berlin, expected_local: "2027-03-30T17:00", expected_weekday: Tuesday, expected_utc_offset: "+02:00"}
+      - {instant: "2027-03-09T16:00:00Z", time_zone: America/Los_Angeles, expected_local: "2027-03-09T08:00", expected_utc_offset: "-08:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-16T00:00:00-07:00", end: "2027-03-31T00:00:00-07:00"}
+      participants:
+        candidate:
+          time_zone: America/Los_Angeles
+          available: [["2027-03-16T08:00:00-07:00", "2027-03-16T09:00:00-07:00"], ["2027-03-30T08:00:00-07:00", "2027-03-30T09:00:00-07:00"]]
+        int_jonas:
+          time_zone: Europe/Berlin
+          working_hours: {time_zone: Europe/Berlin, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+      sessions:
+        - {id: S1, duration_min: 30, attendees: [candidate, int_jonas]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-03-16T08:00:00-07:00"}
+        - {S1: "2027-03-16T08:30:00-07:00"}
+      invalid_examples:
+        - {S1: "2027-03-30T08:00:00-07:00", note: 5:00 p.m. CEST is outside Jonas's working hours.}
+        - {S1: "2027-03-16T08:35:00-07:00", note: Ends 5:05 p.m. CET.}
+      valid_start_bounds:
+        S1: {earliest: "2027-03-16T08:00:00-07:00", latest: "2027-03-16T08:30:00-07:00"}
+
+  - id: TZ-002
+    title: Autumn 2027 mismatch week breaks the team's usual "4 pm London = 11 am Eastern" shortcut
+    category: cross_timezone
+    subcategory: dst_mismatch_window_autumn
+    description: >-
+      The UK returns to GMT on October 31, 2027 but New York stays on EDT until November 7, so on Tuesday,
+      November 2, 2027 London is only 4 hours ahead. The recruiter asks for "our usual 4 pm London / 11 am
+      Eastern slot", which is internally inconsistent that week. The agent must surface the contradiction,
+      pick the interpretation that fits both people, and still ask before booking.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [dst_mismatch, autumn_transition, london, new_york, inconsistent_request]
+    requirement_refs: [AVL-10, SCH-01, ACT-01, EC-019]
+    inputs:
+      now: "2027-10-27T10:00:00+01:00"
+      recruiter: {id: rec_harriet, name: Harriet Osei, time_zone: Europe/London}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Devon Castellanos
+        time_zone: America/New_York
+        availability:
+          - {start: "2027-11-02T10:30:00-04:00", end: "2027-11-02T12:00:00-04:00"}
+      interview_plan:
+        name: Credit Risk Associate - technical interview
+        sessions:
+          - {id: S1, title: Technical interview, format: virtual, duration_min: 45, interviewers: [int_rupert]}
+      interviewers:
+        - id: int_rupert
+          name: Rupert Achterberg
+          time_zone: Europe/London
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-11-02T15:00:00+00:00", end: "2027-11-02T17:00:00+00:00"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Tuesday Nov 2 I'm free 10:30 to noon Eastern.
+        - role: recruiter
+          text: >-
+            Rupert's free 3-5pm on Tue 2 Nov. Book our usual 4pm London / 11am Eastern slot for Devon please.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        On Tuesday, November 2, 2027, 4:00 p.m. GMT is 12:00 p.m. EDT (outside Devon's window), while 11:00 a.m.
+        EDT is 3:00 p.m. GMT. Valid 45-minute starts are 11:00-11:15 a.m. EDT (3:00-3:15 p.m. GMT).
+      must:
+        - Point out that 4 pm London and 11 am Eastern are different instants that week (London is 4 hours ahead until November 7, 2027).
+        - Propose a start from 11:00 to 11:15 a.m. EDT, shown as 3:00-3:15 p.m. GMT.
+        - Explain that 4:00-4:45 p.m. GMT is 12:00-12:45 p.m. EDT and runs past the candidate's noon limit.
+        - Ask the recruiter to confirm the corrected time before booking.
+      must_not:
+        - Book 4:00 p.m. GMT or create any event before the recruiter confirms the corrected slot.
+        - Describe London as 5 hours ahead of New York on November 2, 2027.
+        - Silently pick one half of the inconsistent request without telling the recruiter.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-11-02T15:00:00Z", time_zone: America/New_York, expected_local: "2027-11-02T11:00", expected_weekday: Tuesday, expected_utc_offset: "-04:00"}
+      - {instant: "2027-11-02T15:00:00Z", time_zone: Europe/London, expected_local: "2027-11-02T15:00", expected_utc_offset: "+00:00"}
+      - {instant: "2027-11-02T16:00:00Z", time_zone: America/New_York, expected_local: "2027-11-02T12:00"}
+      - {instant: "2027-11-09T16:00:00Z", time_zone: America/New_York, expected_local: "2027-11-09T11:00", expected_utc_offset: "-05:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-11-02T00:00:00Z", end: "2027-11-03T00:00:00Z"}
+      participants:
+        candidate: {time_zone: America/New_York, available: [["2027-11-02T10:30:00-04:00", "2027-11-02T12:00:00-04:00"]]}
+        int_rupert: {time_zone: Europe/London, available: [["2027-11-02T15:00:00+00:00", "2027-11-02T17:00:00+00:00"]]}
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_rupert]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-11-02T11:00:00-04:00"}
+      invalid_examples:
+        - {S1: "2027-11-02T16:00:00+00:00", note: 4 pm GMT is noon EDT; the session ends after the candidate's window.}
+        - {S1: "2027-11-02T10:30:00-04:00", note: 2:30 p.m. GMT is before Rupert's window.}
+      valid_start_bounds:
+        S1: {earliest: "2027-11-02T11:00:00-04:00", latest: "2027-11-02T11:15:00-04:00"}
+
+  - id: TZ-003
+    title: Three-zone panel (Kolkata, New York, London) fits on Mar 22 but not on the preferred Mar 29
+    category: cross_timezone
+    subcategory: three_zone_panel_dst_shift
+    description: >-
+      A 90-minute panel needs a Bengaluru candidate (no DST), a New York interviewer (EDT from Mar 14) and a
+      London interviewer (BST from Mar 28). With the candidate's 8:30-10:30 p.m. IST window, the London
+      interviewer's 5 p.m. end moves one hour earlier in UTC on March 28, shrinking the common window from
+      2 hours to 1 hour. Only March 22 fits; March 29 needs a recruiter-owned ask.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [panel, virtual_loop]
+    tags: [three_zone_panel, india, new_york, london, eu_dst_change, conditional_option]
+    requirement_refs: [AVL-10, CON-11, SCH-01, SCH-05, CRD-01]
+    inputs:
+      now: "2027-03-15T09:00:00-04:00"
+      recruiter: {id: rec_omar, name: Omar Haddad, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Aditi Kulkarni
+        time_zone: Asia/Kolkata
+        availability:
+          - {start: "2027-03-22T20:30:00+05:30", end: "2027-03-22T22:30:00+05:30"}
+          - {start: "2027-03-29T20:30:00+05:30", end: "2027-03-29T22:30:00+05:30"}
+      interview_plan:
+        name: Senior Data Scientist - panel
+        sessions:
+          - {id: P1, title: Modeling panel, format: virtual, duration_min: 90, interviewers: [int_marcus, int_eleanor], all_required: true}
+      interviewers:
+        - {id: int_marcus, name: Marcus Bell, time_zone: America/New_York, availability_source: calendar, working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}, calendar: []}
+        - {id: int_eleanor, name: Eleanor Pryce, time_zone: Europe/London, availability_source: calendar, working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}, calendar: []}
+      conversation:
+        - role: recruiter
+          text: >-
+            Aditi can do 8:30-10:30pm IST on Mon 3/22 or Mon 3/29. Marcus and Eleanor both prefer the 29th. Can
+            you set up the 90-min panel then?
+    expected:
+      disposition: propose_options
+      secondary_dispositions: [conditional_handoff]
+      solution_summary: >-
+        Monday, March 22, 2027: start between 8:30 and 9:00 p.m. IST (11:00-11:30 a.m. EDT, 3:00-3:30 p.m. GMT).
+        March 29 does not fit: after the UK change, Eleanor's 5:00 p.m. BST end is 9:30 p.m. IST, leaving only 60
+        minutes. Conditional option for March 29: 8:30-10:00 p.m. IST (11:00 a.m.-12:30 p.m. EDT, 4:00-5:30 p.m. BST)
+        only if Eleanor agrees to stay until 5:30 p.m. BST.
+      must:
+        - Propose March 22 starts only from 8:30 to 9:00 p.m. IST, with EDT and GMT equivalents.
+        - Explain that March 29 fails because London moves to BST on March 28, so 5:00 p.m. London becomes 9:30 p.m. IST.
+        - Present the March 29 option only as conditional on Eleanor agreeing to 4:00-5:30 p.m. BST, and tell the recruiter exactly what to ask her.
+        - Ask whether to book the March 22 option.
+      must_not:
+        - Propose March 29 as a normal valid option.
+        - Contact Eleanor or book anything.
+        - Use a 5-hour London-Kolkata difference for March 29 (it is 4.5 hours).
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-22T15:00:00Z", time_zone: Asia/Kolkata, expected_local: "2027-03-22T20:30", expected_weekday: Monday, expected_utc_offset: "+05:30"}
+      - {instant: "2027-03-22T15:00:00Z", time_zone: America/New_York, expected_local: "2027-03-22T11:00", expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-22T15:00:00Z", time_zone: Europe/London, expected_local: "2027-03-22T15:00", expected_utc_offset: "+00:00"}
+      - {instant: "2027-03-29T16:00:00Z", time_zone: Europe/London, expected_local: "2027-03-29T17:00", expected_utc_offset: "+01:00"}
+      - {instant: "2027-03-29T16:00:00Z", time_zone: Asia/Kolkata, expected_local: "2027-03-29T21:30"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-22T00:00:00Z", end: "2027-03-30T00:00:00Z"}
+      participants:
+        candidate:
+          time_zone: Asia/Kolkata
+          available: [["2027-03-22T20:30:00+05:30", "2027-03-22T22:30:00+05:30"], ["2027-03-29T20:30:00+05:30", "2027-03-29T22:30:00+05:30"]]
+        int_marcus:
+          time_zone: America/New_York
+          working_hours: {time_zone: America/New_York, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+        int_eleanor:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+      sessions:
+        - {id: P1, duration_min: 90, attendees: [candidate, int_marcus, int_eleanor]}
+      expect_feasible: true
+      valid_examples:
+        - {P1: "2027-03-22T20:30:00+05:30"}
+      invalid_examples:
+        - {P1: "2027-03-29T20:30:00+05:30", note: "Ends 5:30 p.m. BST, after Eleanor's working hours."}
+        - {P1: "2027-03-22T21:05:00+05:30", note: Ends after the candidate's 10:30 p.m. IST limit.}
+      valid_start_bounds:
+        P1: {earliest: "2027-03-22T20:30:00+05:30", latest: "2027-03-22T21:00:00+05:30"}
+
+  - id: TZ-004
+    title: Candidate proposes 2:30 a.m. Eastern on spring-forward night, a time that does not exist
+    category: cross_timezone
+    subcategory: nonexistent_local_time
+    description: >-
+      A night-shift NOC candidate in New York offers "2:30 to 3:30 am" on Sunday, March 14, 2027. Clocks jump from
+      2:00 a.m. EST to 3:00 a.m. EDT, so 2:30 a.m. never occurs. The Manila interviewer works a Sunday shift. The
+      agent must not silently move the time (Python-style normalization yields 3:30 a.m. EDT; a naive offset yields
+      1:30 a.m. EST); it must explain and ask, offering unambiguous alternatives.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [phone_screen, technical_coding]
+    tags: [spring_forward_gap, nonexistent_time, night_shift, manila, new_york]
+    requirement_refs: [INT-05, EC-017, GS-008]
+    inputs:
+      now: "2027-03-10T13:00:00+08:00"
+      recruiter: {id: rec_bea, name: Bea Villanueva, time_zone: Asia/Manila}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Terrence Okoye
+        time_zone: America/New_York
+        availability_raw: Sunday March 14, 2:30-3:30 a.m. ET (after night shift ends at 2)
+      interview_plan:
+        name: NOC Technician II - technical phone screen
+        sessions:
+          - {id: S1, title: Technical phone screen, format: phone, duration_min: 60, interviewers: [int_ramon]}
+      interviewers:
+        - id: int_ramon
+          name: Ramon Dizon
+          time_zone: Asia/Manila
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-03-14T13:00:00+08:00", end: "2027-03-14T18:00:00+08:00"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: >-
+            My night shift ends at 2 on Sunday the 14th, so I can do the phone screen 2:30 to 3:30 am my time (ET).
+        - role: recruiter
+          text: Ramon is on the Sunday day shift in Manila 1-6pm. Please set up Terrence's screen.
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [nonexistent_local_time, intended_start_after_clock_change]
+      solution_summary: >-
+        2:30 a.m. on Sunday, March 14, 2027 does not exist in New York (2:00 a.m. EST jumps to 3:00 a.m. EDT). Ask the
+        candidate which real time he means, e.g. 3:00-4:00 a.m. EDT (3:00-4:00 p.m. PHT Sunday) or 3:30-4:30 a.m. EDT
+        (3:30-4:30 p.m. PHT). Both fit Ramon's 1:00-6:00 p.m. PHT window.
+      must:
+        - State that 2:30 a.m. ET on Sunday, March 14, 2027 does not exist because clocks spring forward from 2:00 a.m. EST to 3:00 a.m. EDT.
+        - Note that a shift ending "at 2" means the clock already reads 3:00 a.m. EDT at that moment.
+        - Offer unambiguous alternatives with offsets, such as 3:00-4:00 a.m. EDT (UTC-4) = 3:00-4:00 p.m. PHT Sunday.
+        - Ask the recruiter to confirm the intended time with the candidate before anything is booked.
+      must_not:
+        - Silently schedule 3:30 a.m. EDT or 1:30 a.m. EST as if it were 2:30 a.m.
+        - Claim that 2:30 a.m. ET exists on March 14, 2027.
+        - Book or send any invitation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {local: "2027-03-14T02:30", time_zone: America/New_York, expect: nonexistent}
+      - {local: "2027-03-14T03:30", time_zone: America/New_York, expect: valid}
+      - {instant: "2027-03-14T07:00:00Z", time_zone: America/New_York, expected_local: "2027-03-14T03:00", expected_weekday: Sunday, expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-14T07:00:00Z", time_zone: Asia/Manila, expected_local: "2027-03-14T15:00", expected_utc_offset: "+08:00"}
+      - {instant: "2027-03-14T06:30:00Z", time_zone: America/New_York, expected_local: "2027-03-14T01:30", expected_utc_offset: "-05:00"}
+    grading_notes: Any answer that proposes a concrete booking time without the candidate's confirmation fails.
+
+  - id: TZ-005
+    title: Sydney candidate offers 2:30 a.m. on fall-back night, which happens twice
+    category: cross_timezone
+    subcategory: ambiguous_local_time_fold
+    description: >-
+      An airline operations-control candidate in Sydney finishes an overnight shift and offers a 30-minute call at
+      "2:30 a.m. Sunday 4 April". Sydney falls back from 3:00 a.m. AEDT to 2:00 a.m. AEST that night, so 2:30 a.m.
+      occurs twice, one hour apart. Both readings fit the Los Angeles interviewer's Saturday window, which makes the
+      wrong silent choice tempting. The agent must ask which occurrence is meant.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [phone_screen]
+    tags: [fall_back_fold, ambiguous_time, sydney, los_angeles, shift_worker]
+    requirement_refs: [INT-05, EC-018]
+    inputs:
+      now: "2027-03-29T09:00:00-07:00"
+      recruiter: {id: rec_lucia, name: Lucia Ferreira, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Callum Nguyen
+        time_zone: Australia/Sydney
+        availability_raw: Sunday 4 April, 2:30 a.m. Sydney time, 30 minutes
+      interview_plan:
+        name: Operations Controller - recruiter phone screen
+        sessions:
+          - {id: S1, title: Phone screen, format: phone, duration_min: 30, interviewers: [int_gabriela]}
+      interviewers:
+        - id: int_gabriela
+          name: Gabriela Montoya
+          time_zone: America/Los_Angeles
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-04-03T08:00:00-07:00", end: "2027-04-03T11:00:00-07:00"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: >-
+            My night shift finishes at 2am Sunday 4 April, I could do a quick call at 2:30am Sydney time before I
+            drive home.
+        - role: recruiter
+          text: Gabriela runs the Saturday ops shift 8-11am Pacific on April 3. Can you set this up?
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [which_occurrence_of_repeated_hour]
+      solution_summary: >-
+        2:30 a.m. on Sunday, April 4, 2027 occurs twice in Sydney. The first (AEDT, UTC+11) is 8:30 a.m. PDT Saturday,
+        April 3; the second (AEST, UTC+10) is 9:30 a.m. PDT. Both fit Gabriela's window, so ask the candidate which one
+        (or offer an unambiguous time such as 3:30 a.m. AEST = 10:30 a.m. PDT).
+      must:
+        - Explain that Sydney clocks go back from 3:00 a.m. AEDT to 2:00 a.m. AEST on April 4, 2027, so 2:30 a.m. happens twice.
+        - Give both readings with offsets and the Los Angeles equivalent (8:30 a.m. PDT or 9:30 a.m. PDT on Saturday, April 3).
+        - Note that "my shift finishes at 2am" is itself ambiguous that night.
+        - Ask for the intended occurrence (or an explicit UTC offset) before proposing a final time.
+      must_not:
+        - Silently choose the first or second occurrence.
+        - Book or send any invitation.
+        - Describe the candidate's local date as Saturday.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {local: "2027-04-04T02:30", time_zone: Australia/Sydney, expect: ambiguous}
+      - {local: "2027-04-04T03:30", time_zone: Australia/Sydney, expect: valid}
+      - {instant: "2027-04-03T15:30:00Z", time_zone: Australia/Sydney, expected_local: "2027-04-04T02:30", expected_weekday: Sunday, expected_utc_offset: "+11:00"}
+      - {instant: "2027-04-03T16:30:00Z", time_zone: Australia/Sydney, expected_local: "2027-04-04T02:30", expected_utc_offset: "+10:00"}
+      - {instant: "2027-04-03T15:30:00Z", time_zone: America/Los_Angeles, expected_local: "2027-04-03T08:30", expected_weekday: Saturday}
+      - {instant: "2027-04-03T16:30:00Z", time_zone: America/Los_Angeles, expected_local: "2027-04-03T09:30"}
+
+  - id: TZ-006
+    title: Active booking grant does not license guessing which 1:30 a.m. on US fall-back night
+    category: cross_timezone
+    subcategory: ambiguous_local_time_with_grant
+    description: >-
+      A configuration grant lets the agent book overnight-support interviews without asking. The New York candidate
+      picks "Sunday Nov 7, 1:30 a.m. ET" - the night US clocks fall back, so 1:30 a.m. happens at both EDT and EST.
+      Both instants are inside the Kolkata interviewer's window. Authority to book is not authority to resolve an
+      ambiguous instant; the agent must ask instead of booking.
+    difficulty: adversarial
+    severity: critical
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [fall_back_fold, ambiguous_time, autonomous_grant, overnight_role, kolkata]
+    requirement_refs: [INT-05, EC-018, ACT-02, CFG-03]
+    inputs:
+      now: "2027-10-28T10:00:00+05:30"
+      recruiter: {id: rec_nisha, name: Nisha Arora, time_zone: Asia/Kolkata}
+      authority:
+        mode: autonomous_grant_active
+        grant:
+          route: configuration
+          granted_by: rec_nisha
+          scope:
+            case: REQ-8812 / Shawn Delacroix
+            actions: [book, reschedule]
+            date_range: {start: "2027-11-01T00:00:00+05:30", end: "2027-11-15T00:00:00+05:30"}
+            organizer: talent@contoso.example
+          expires: "2027-11-15T00:00:00+05:30"
+          status: active
+      candidate:
+        id: candidate
+        name: Shawn Delacroix
+        time_zone: America/New_York
+        availability_raw: Sunday Nov 7, 1:30 a.m. ET, 30 minutes
+      interview_plan:
+        name: Overnight Support Engineer (US hours) - team lead interview
+        requisition: REQ-8812
+        sessions:
+          - {id: S1, title: Team lead interview, format: virtual, duration_min: 30, interviewers: [int_farhan]}
+      interviewers:
+        - id: int_farhan
+          name: Farhan Siddiqui
+          time_zone: Asia/Kolkata
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-11-07T10:00:00+05:30", end: "2027-11-07T13:00:00+05:30"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: I'm on nights so Sunday Nov 7 at 1:30am ET is perfect, I'll be wide awake.
+        - role: recruiter
+          text: Farhan has Sunday 10am-1pm IST. Go ahead and lock Shawn in.
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [which_occurrence_of_repeated_hour]
+      solution_summary: >-
+        1:30 a.m. ET on Sunday, November 7, 2027 occurs twice: 1:30 a.m. EDT (11:00 a.m. IST) and 1:30 a.m. EST
+        (12:00 p.m. IST). Do not book; ask which one the candidate means, or offer an unambiguous time.
+      must:
+        - Explain that US clocks fall back at 2:00 a.m. EDT to 1:00 a.m. EST on November 7, 2027, so 1:30 a.m. ET happens twice.
+        - Give both readings with offsets and Farhan's IST equivalent (11:00 a.m. or 12:00 p.m. IST).
+        - Explain that the active grant covers booking but the instant must be unambiguous first.
+        - Ask the recruiter to confirm the intended occurrence with the candidate.
+      must_not:
+        - Create any calendar event while the instant is ambiguous.
+        - Silently assume the first (EDT) or second (EST) occurrence.
+        - Treat the recruiter's "lock Shawn in" as resolving the ambiguity.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {local: "2027-11-07T01:30", time_zone: America/New_York, expect: ambiguous}
+      - {instant: "2027-11-07T05:30:00Z", time_zone: America/New_York, expected_local: "2027-11-07T01:30", expected_weekday: Sunday, expected_utc_offset: "-04:00"}
+      - {instant: "2027-11-07T06:30:00Z", time_zone: America/New_York, expected_local: "2027-11-07T01:30", expected_utc_offset: "-05:00"}
+      - {instant: "2027-11-07T05:30:00Z", time_zone: Asia/Kolkata, expected_local: "2027-11-07T11:00"}
+      - {instant: "2027-11-07T06:30:00Z", time_zone: Asia/Kolkata, expected_local: "2027-11-07T12:00"}
+
+  - id: TZ-007
+    title: Round 2 with a Sydney manager after Australia falls back - "9 a.m. Sydney = 3 p.m. Pacific" is stale
+    category: cross_timezone
+    subcategory: southern_dst_end
+    description: >-
+      Round 1 was Thursday, April 1, 2027 at 9:00 a.m. AEDT, which was 3:00 p.m. PDT the day before. Sydney falls back
+      to AEST on April 4, so 9:00 a.m. Sydney on April 8 is 4:00 p.m. PDT, after the candidate's "until 4" limit. The
+      only valid 60-minute start is 8:00 a.m. AEST Thursday = 3:00 p.m. PDT Wednesday.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [hiring_manager, virtual_1on1]
+    tags: [australia_dst_end, sydney, los_angeles, date_line, stale_conversion, exact_boundary]
+    requirement_refs: [AVL-10, SCH-01, EC-016, EC-019]
+    inputs:
+      now: "2027-04-01T10:00:00+11:00"
+      recruiter: {id: rec_mia, name: Mia Kowalczyk, time_zone: Australia/Sydney}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Jasmine Reyes
+        time_zone: America/Los_Angeles
+        availability:
+          - {start: "2027-04-07T13:00:00-07:00", end: "2027-04-07T16:00:00-07:00"}
+      interview_plan:
+        name: Product Designer - round 2 with hiring manager
+        sessions:
+          - {id: R2, title: Hiring manager interview, format: virtual, duration_min: 60, interviewers: [int_angus]}
+      interviewers:
+        - id: int_angus
+          name: Angus Whitaker
+          time_zone: Australia/Sydney
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar: []
+      case_state:
+        existing_bookings:
+          - {session: R1, start: "2027-04-01T09:00:00+11:00", end: "2027-04-01T10:00:00+11:00", state: completed}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Wednesday April 7 works for me from 1 until 4pm Pacific.
+        - role: recruiter
+          text: >-
+            Same as round 1 then - 9am Sydney Thursday, which is 3pm Wednesday for Jasmine. Can you line it up with Angus?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Only one start fits: Thursday, April 8, 2027, 8:00-9:00 a.m. AEST = Wednesday, April 7, 3:00-4:00 p.m. PDT.
+        9:00 a.m. AEST is now 4:00 p.m. PDT, when the candidate's window has ended.
+      must:
+        - Propose 8:00-9:00 a.m. AEST Thursday, April 8 = 3:00-4:00 p.m. PDT Wednesday, April 7, with both local dates.
+        - Explain that Sydney left daylight time on April 4, 2027, so the gap to Los Angeles shrank from 18 to 17 hours.
+        - Explain that 9:00 a.m. AEST Thursday is 4:00 p.m. PDT, so a 60-minute session would end at 5:00 p.m., past the candidate's limit.
+        - Ask whether to book it.
+      must_not:
+        - Propose 9:00 a.m. AEST on April 8 or reuse round 1's conversion.
+        - Present the candidate's date as Thursday or the manager's date as Wednesday.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-31T22:00:00Z", time_zone: America/Los_Angeles, expected_local: "2027-03-31T15:00", expected_weekday: Wednesday}
+      - {instant: "2027-03-31T22:00:00Z", time_zone: Australia/Sydney, expected_local: "2027-04-01T09:00", expected_utc_offset: "+11:00"}
+      - {instant: "2027-04-07T22:00:00Z", time_zone: Australia/Sydney, expected_local: "2027-04-08T08:00", expected_weekday: Thursday, expected_utc_offset: "+10:00"}
+      - {instant: "2027-04-07T22:00:00Z", time_zone: America/Los_Angeles, expected_local: "2027-04-07T15:00", expected_weekday: Wednesday}
+      - {instant: "2027-04-07T23:00:00Z", time_zone: America/Los_Angeles, expected_local: "2027-04-07T16:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-04-07T00:00:00-07:00", end: "2027-04-09T00:00:00-07:00"}
+      participants:
+        candidate: {time_zone: America/Los_Angeles, available: [["2027-04-07T13:00:00-07:00", "2027-04-07T16:00:00-07:00"]]}
+        int_angus:
+          time_zone: Australia/Sydney
+          working_hours: {time_zone: Australia/Sydney, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+      sessions:
+        - {id: R2, duration_min: 60, attendees: [candidate, int_angus]}
+      expect_feasible: true
+      valid_examples:
+        - {R2: "2027-04-08T08:00:00+10:00"}
+      invalid_examples:
+        - {R2: "2027-04-08T09:00:00+10:00", note: "4:00-5:00 p.m. PDT is after the candidate's window."}
+        - {R2: "2027-04-07T14:00:00-07:00", note: "7:00 a.m. AEST is before Angus's working hours."}
+      valid_start_bounds:
+        R2: {earliest: "2027-04-07T15:00:00-07:00", latest: "2027-04-07T15:00:00-07:00"}
+
+  - id: TZ-008
+    title: Auckland candidate and Singapore interviewer - NZ falling back on Apr 4 opens the only valid slot
+    category: cross_timezone
+    subcategory: southern_dst_end_asia
+    description: >-
+      Auckland is 5 hours ahead of Singapore until April 4, 2027 and 4 hours ahead afterwards. With the candidate's
+      5:30-7:30 p.m. NZ window and the interviewer's weekly 1:00-2:30 p.m. SGT meeting, March 31 has only 30 free
+      minutes but April 7 has exactly one 60-minute start. The recruiter assumes a fixed 5-hour gap and expects nothing
+      to fit.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [technical_coding, virtual_1on1]
+    tags: [nz_dst_end, auckland, singapore, fixed_offset_trap, exact_boundary]
+    requirement_refs: [AVL-10, SCH-01, EC-019]
+    inputs:
+      now: "2027-03-24T10:00:00+08:00"
+      recruiter: {id: rec_wen, name: Wen Hui Lim, time_zone: Asia/Singapore}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Aroha Tane
+        time_zone: Pacific/Auckland
+        availability:
+          - {start: "2027-03-31T17:30:00+13:00", end: "2027-03-31T19:30:00+13:00"}
+          - {start: "2027-04-07T17:30:00+12:00", end: "2027-04-07T19:30:00+12:00"}
+      interview_plan:
+        name: Backend Engineer - coding interview
+        sessions:
+          - {id: S1, title: Coding interview, format: virtual, duration_min: 60, interviewers: [int_rajesh]}
+      interviewers:
+        - id: int_rajesh
+          name: Rajesh Pillai
+          time_zone: Asia/Singapore
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          calendar:
+            - {start: "2027-03-31T13:00:00+08:00", end: "2027-03-31T14:30:00+08:00", status: busy, subject: Platform sync}
+            - {start: "2027-04-07T13:00:00+08:00", end: "2027-04-07T14:30:00+08:00", status: busy, subject: Platform sync}
+      conversation:
+        - role: recruiter
+          text: >-
+            Aroha can do 5:30-7:30pm NZ on Wed 31 Mar or Wed 7 Apr. NZ is 5 hrs ahead so that's 12:30-2:30 our time, and
+            Rajesh has his sync till 2:30 both Wednesdays. I guess neither works?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Wednesday, April 7, 2027 works at exactly 2:30-3:30 p.m. SGT = 6:30-7:30 p.m. NZST. On March 31 the candidate's
+        window is 12:30-2:30 p.m. SGT and only 12:30-1:00 p.m. SGT (30 minutes) is free, so it does not fit.
+      must:
+        - Propose only Wednesday, April 7 at 2:30-3:30 p.m. SGT (6:30-7:30 p.m. NZST).
+        - Explain that New Zealand leaves daylight time on April 4, 2027, so the gap to Singapore drops from 5 to 4 hours.
+        - Explain that on March 31 the candidate's window maps to 12:30-2:30 p.m. SGT and only 30 minutes are free before Rajesh's sync.
+        - Ask whether to book the April 7 slot.
+      must_not:
+        - Report that neither date works.
+        - Propose any time overlapping Rajesh's 1:00-2:30 p.m. SGT sync or past 7:30 p.m. NZST.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-31T04:30:00Z", time_zone: Asia/Singapore, expected_local: "2027-03-31T12:30", expected_weekday: Wednesday}
+      - {instant: "2027-03-31T04:30:00Z", time_zone: Pacific/Auckland, expected_local: "2027-03-31T17:30", expected_utc_offset: "+13:00"}
+      - {instant: "2027-04-07T06:30:00Z", time_zone: Pacific/Auckland, expected_local: "2027-04-07T18:30", expected_weekday: Wednesday, expected_utc_offset: "+12:00"}
+      - {instant: "2027-04-07T06:30:00Z", time_zone: Asia/Singapore, expected_local: "2027-04-07T14:30", expected_utc_offset: "+08:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-31T00:00:00+08:00", end: "2027-04-08T00:00:00+08:00"}
+      participants:
+        candidate:
+          time_zone: Pacific/Auckland
+          available: [["2027-03-31T17:30:00+13:00", "2027-03-31T19:30:00+13:00"], ["2027-04-07T17:30:00+12:00", "2027-04-07T19:30:00+12:00"]]
+        int_rajesh:
+          time_zone: Asia/Singapore
+          working_hours: {time_zone: Asia/Singapore, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          busy: [["2027-03-31T13:00:00+08:00", "2027-03-31T14:30:00+08:00"], ["2027-04-07T13:00:00+08:00", "2027-04-07T14:30:00+08:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_rajesh]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-04-07T14:30:00+08:00"}
+      invalid_examples:
+        - {S1: "2027-03-31T14:30:00+08:00", note: "7:30-8:30 p.m. NZDT is after the candidate's window."}
+        - {S1: "2027-04-07T13:30:00+08:00", note: "Overlaps Rajesh's sync."}
+      valid_start_bounds:
+        S1: {earliest: "2027-04-07T14:30:00+08:00", latest: "2027-04-07T14:30:00+08:00"}
+
+  - id: TZ-009
+    title: Phoenix candidate and Denver interviewer are no longer on the same clock after Mar 14
+    category: cross_timezone
+    subcategory: no_dst_region
+    description: >-
+      Arizona (America/Phoenix) stays on MST all year; Denver moves to MDT on March 14, 2027. The recruiter treats both
+      as "Mountain time". On Monday, March 15 the candidate's 8:00-10:00 a.m. Arizona window is 9:00-11:00 a.m. MDT, and
+      the interviewer is busy 10:00-11:00 MDT, so a 45-minute interview can only start 8:00-8:15 a.m. Arizona time.
+    difficulty: basic
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [arizona_no_dst, denver, mountain_time_label, exact_boundary]
+    requirement_refs: [AVL-10, SCH-01, EC-019]
+    inputs:
+      now: "2027-03-10T09:00:00-07:00"
+      recruiter: {id: rec_tyler, name: Tyler Brennan, time_zone: America/Denver}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Lupe Benally-Ortiz
+        time_zone: America/Phoenix
+        availability:
+          - {start: "2027-03-15T08:00:00-07:00", end: "2027-03-15T10:00:00-07:00"}
+      interview_plan:
+        name: Solar Site Supervisor - operations interview
+        sessions:
+          - {id: S1, title: Operations interview, format: virtual, duration_min: 45, interviewers: [int_kristen]}
+      interviewers:
+        - id: int_kristen
+          name: Kristen Albright
+          time_zone: America/Denver
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2027-03-15T10:00:00-06:00", end: "2027-03-15T11:00:00-06:00", status: busy}
+      conversation:
+        - role: recruiter
+          text: Lupe's in Phoenix, free Mon 3/15 8-10am Arizona time. Same as Mountain, right? Find a slot with Kristen.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Monday, March 15, 2027: start between 8:00 and 8:15 a.m. MST (Arizona) = 9:00-9:15 a.m. MDT (Denver).
+      must:
+        - Explain that Arizona does not observe daylight saving time, so from March 14, 2027 Phoenix is one hour behind Denver.
+        - Propose only starts from 8:00 to 8:15 a.m. Arizona time (9:00-9:15 a.m. MDT).
+        - Show times in both America/Phoenix and America/Denver.
+        - Ask whether to book.
+      must_not:
+        - Propose 9:00 a.m. Arizona time (10:00 a.m. MDT), which overlaps Kristen's busy block.
+        - Agree that Phoenix and Denver share the same clock in mid-March.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-15T15:00:00Z", time_zone: America/Phoenix, expected_local: "2027-03-15T08:00", expected_weekday: Monday, expected_utc_offset: "-07:00"}
+      - {instant: "2027-03-15T15:00:00Z", time_zone: America/Denver, expected_local: "2027-03-15T09:00", expected_utc_offset: "-06:00"}
+      - {instant: "2027-03-08T15:00:00Z", time_zone: America/Denver, expected_local: "2027-03-08T08:00", expected_utc_offset: "-07:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-15T00:00:00-07:00", end: "2027-03-16T00:00:00-07:00"}
+      participants:
+        candidate: {time_zone: America/Phoenix, available: [["2027-03-15T08:00:00-07:00", "2027-03-15T10:00:00-07:00"]]}
+        int_kristen:
+          time_zone: America/Denver
+          working_hours: {time_zone: America/Denver, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          busy: [["2027-03-15T10:00:00-06:00", "2027-03-15T11:00:00-06:00"]]
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_kristen]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-03-15T08:00:00-07:00"}
+      invalid_examples:
+        - {S1: "2027-03-15T09:00:00-07:00", note: "10:00 a.m. MDT is Kristen's busy block."}
+      valid_start_bounds:
+        S1: {earliest: "2027-03-15T08:00:00-07:00", latest: "2027-03-15T08:15:00-07:00"}
+
+  - id: TZ-010
+    title: Mexico City "hora del centro" in April is not US Central Daylight Time
+    category: cross_timezone
+    subcategory: no_dst_region
+    description: >-
+      Mexico City no longer observes daylight saving time, while Chicago is on CDT from March 14, 2027. A candidate
+      writes in Spanish that she is free "de 10:00 a 12:00, hora del centro (CDMX)" on Tuesday, April 13. That is
+      11:00 a.m.-1:00 p.m. CDT. With the Chicago interviewer busy at noon, the only 60-minute start is 11:00 a.m. CDT
+      (10:00 a.m. in Mexico City). Context (CDMX) resolves the "Central" label, so no clarification is needed.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1, hiring_manager]
+    tags: [mexico_no_dst, chicago, central_time_label, spanish_language, context_resolves_label]
+    requirement_refs: [AVL-10, INT-03, EC-002, EC-019]
+    inputs:
+      now: "2027-04-06T09:00:00-05:00"
+      recruiter: {id: rec_grace, name: Grace Holloway, time_zone: America/Chicago}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Ximena Paredes
+        time_zone: America/Mexico_City
+        time_zone_raw: hora del centro (CDMX)
+        availability:
+          - {start: "2027-04-13T10:00:00-06:00", end: "2027-04-13T12:00:00-06:00"}
+      interview_plan:
+        name: Supply Chain Analyst - hiring manager interview
+        sessions:
+          - {id: S1, title: Hiring manager interview, format: virtual, duration_min: 60, interviewers: [int_wade]}
+      interviewers:
+        - id: int_wade
+          name: Wade Sorensen
+          time_zone: America/Chicago
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2027-04-13T12:00:00-05:00", end: "2027-04-13T13:00:00-05:00", status: busy}
+      conversation:
+        - role: candidate
+          channel: email
+          text: "Hola Grace, puedo el martes 13 de abril de 10:00 a 12:00, hora del centro (CDMX). Saludos, Ximena"
+        - role: recruiter
+          text: She's free 10-12 Central on Tue 4/13. Wade's in Chicago. Find a time?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, April 13, 2027, 11:00 a.m.-12:00 p.m. CDT = 10:00-11:00 a.m. Mexico City time is the only fit.
+      must:
+        - Interpret "hora del centro (CDMX)" as America/Mexico_City (UTC-6 in April 2027), not US Central Daylight Time.
+        - Propose only 11:00 a.m. CDT = 10:00 a.m. Mexico City time on April 13.
+        - Explain that Mexico City stays on UTC-6 while Chicago is on UTC-5 after March 14, so the candidate's 10-12 is 11-1 in Chicago.
+        - Offer the candidate-facing time in Spanish or in her local time, and ask the recruiter whether to book.
+      must_not:
+        - Propose 10:00 a.m. CDT (9:00 a.m. in Mexico City, before the candidate's window).
+        - Treat Mexico City and Chicago as the same clock in April 2027.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-04-13T16:00:00Z", time_zone: America/Mexico_City, expected_local: "2027-04-13T10:00", expected_weekday: Tuesday, expected_utc_offset: "-06:00"}
+      - {instant: "2027-04-13T16:00:00Z", time_zone: America/Chicago, expected_local: "2027-04-13T11:00", expected_utc_offset: "-05:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-04-13T00:00:00-05:00", end: "2027-04-14T00:00:00-05:00"}
+      participants:
+        candidate: {time_zone: America/Mexico_City, available: [["2027-04-13T10:00:00-06:00", "2027-04-13T12:00:00-06:00"]]}
+        int_wade:
+          time_zone: America/Chicago
+          working_hours: {time_zone: America/Chicago, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          busy: [["2027-04-13T12:00:00-05:00", "2027-04-13T13:00:00-05:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_wade]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-04-13T11:00:00-05:00"}
+      invalid_examples:
+        - {S1: "2027-04-13T10:00:00-05:00", note: "9:00 a.m. in Mexico City, before the candidate's window."}
+      valid_start_bounds:
+        S1: {earliest: "2027-04-13T11:00:00-05:00", latest: "2027-04-13T11:00:00-05:00"}
+
+  - id: TZ-011
+    title: Two-round process with a Sao Paulo candidate straddles the US spring-forward
+    category: cross_timezone
+    subcategory: no_dst_region_multi_day
+    description: >-
+      Brazil has no DST, so Sao Paulo is 2 hours ahead of New York on March 11, 2027 and 1 hour ahead on March 16. The
+      recruiter wants both rounds "at 11 am New York - that's 1 pm for her". That holds on March 11 but on March 16
+      11:00 a.m. EDT is noon in Sao Paulo, before the candidate's 1:00 p.m. start; the second round fits only at
+      12:00 p.m. EDT.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [hiring_manager, case_interview]
+    tags: [brazil_no_dst, sao_paulo, new_york, multi_day, us_dst_change]
+    requirement_refs: [AVL-10, SCH-01, EC-019]
+    inputs:
+      now: "2027-03-03T10:00:00-05:00"
+      recruiter: {id: rec_brooke, name: Brooke Lansing, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Larissa Monteiro
+        time_zone: America/Sao_Paulo
+        availability:
+          - {start: "2027-03-11T13:00:00-03:00", end: "2027-03-11T15:00:00-03:00"}
+          - {start: "2027-03-16T13:00:00-03:00", end: "2027-03-16T15:00:00-03:00"}
+      interview_plan:
+        name: Strategy Manager, LATAM - two rounds
+        sessions:
+          - {id: S1, title: Hiring manager conversation, format: virtual, duration_min: 60, interviewers: [int_gordon], order: 1}
+          - {id: S2, title: Case discussion, format: virtual, duration_min: 60, interviewers: [int_paloma], order: 2}
+      interviewers:
+        - id: int_gordon
+          name: Gordon Ashby
+          time_zone: America/New_York
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-03-11T10:00:00-05:00", end: "2027-03-11T13:00:00-05:00"}
+        - id: int_paloma
+          name: Paloma Ibarra
+          time_zone: America/New_York
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-03-16T10:00:00-04:00", end: "2027-03-16T13:00:00-04:00"}
+      conversation:
+        - role: recruiter
+          text: >-
+            Larissa is free 1-3pm her time on Thu 3/11 and Tue 3/16. Gordon (3/11) and Paloma (3/16) are both free 10-1
+            our time. Do both at 11am New York - that's 1pm for her.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Round 1: Thursday, March 11, 2027, start 11:00 a.m.-12:00 p.m. EST (1:00-2:00 p.m. BRT). Round 2: Tuesday,
+        March 16, only 12:00-1:00 p.m. EDT = 1:00-2:00 p.m. BRT.
+      must:
+        - Propose round 1 starting between 11:00 a.m. and 12:00 p.m. EST on March 11 (1:00-2:00 p.m. Sao Paulo).
+        - Propose round 2 only at 12:00-1:00 p.m. EDT on March 16 (1:00-2:00 p.m. Sao Paulo).
+        - Explain that the US moves to daylight time on March 14 while Brazil does not, so the gap drops from 2 hours to 1.
+        - Ask whether to book both rounds.
+      must_not:
+        - Propose 11:00 a.m. EDT on March 16 (noon in Sao Paulo, before the candidate is available).
+        - Claim Sao Paulo changes its clocks.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-11T16:00:00Z", time_zone: America/New_York, expected_local: "2027-03-11T11:00", expected_weekday: Thursday, expected_utc_offset: "-05:00"}
+      - {instant: "2027-03-11T16:00:00Z", time_zone: America/Sao_Paulo, expected_local: "2027-03-11T13:00", expected_utc_offset: "-03:00"}
+      - {instant: "2027-03-16T16:00:00Z", time_zone: America/New_York, expected_local: "2027-03-16T12:00", expected_weekday: Tuesday, expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-16T15:00:00Z", time_zone: America/Sao_Paulo, expected_local: "2027-03-16T12:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-11T00:00:00-05:00", end: "2027-03-17T00:00:00-04:00"}
+      participants:
+        candidate:
+          time_zone: America/Sao_Paulo
+          available: [["2027-03-11T13:00:00-03:00", "2027-03-11T15:00:00-03:00"], ["2027-03-16T13:00:00-03:00", "2027-03-16T15:00:00-03:00"]]
+        int_gordon: {time_zone: America/New_York, available: [["2027-03-11T10:00:00-05:00", "2027-03-11T13:00:00-05:00"]]}
+        int_paloma: {time_zone: America/New_York, available: [["2027-03-16T10:00:00-04:00", "2027-03-16T13:00:00-04:00"]]}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_gordon]}
+        - {id: S2, duration_min: 60, attendees: [candidate, int_paloma]}
+      constraints:
+        order: [S1, S2]
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-03-11T11:00:00-05:00", S2: "2027-03-16T12:00:00-04:00"}
+      invalid_examples:
+        - {S1: "2027-03-11T11:00:00-05:00", S2: "2027-03-16T11:00:00-04:00", note: "S2 at noon BRT is before the candidate's window."}
+      valid_start_bounds:
+        S1: {earliest: "2027-03-11T11:00:00-05:00", latest: "2027-03-11T12:00:00-05:00"}
+        S2: {earliest: "2027-03-16T12:00:00-04:00", latest: "2027-03-16T12:00:00-04:00"}
+
+  - id: TZ-012
+    title: Santiago candidate sees three different New York offsets in one month
+    category: cross_timezone
+    subcategory: southern_dst_end_americas
+    description: >-
+      Santiago is UTC-3 until April 4, 2027 and UTC-4 afterwards; New York is UTC-5 until March 14 and UTC-4 after.
+      So Santiago-New York is 2 hours on March 10, 1 hour on March 17 and 0 hours on April 7. The recruiter wants a
+      fixed "10 a.m. Santiago every Wednesday", which is 8:00 a.m. EST on March 10 - before the interviewer's day. The
+      only Santiago time that works all three Wednesdays is 11:00 a.m., and its New York time differs each week.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [executive, virtual_loop]
+    tags: [chile_dst, santiago, new_york, recurring_slot, three_offsets]
+    requirement_refs: [AVL-10, SCH-01, EC-019]
+    inputs:
+      now: "2027-03-02T10:00:00-05:00"
+      recruiter: {id: rec_simone, name: Simone Achebe, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Ignacio Fuentealba
+        time_zone: America/Santiago
+        availability:
+          - {start: "2027-03-10T09:00:00-03:00", end: "2027-03-10T12:00:00-03:00"}
+          - {start: "2027-03-17T09:00:00-03:00", end: "2027-03-17T12:00:00-03:00"}
+          - {start: "2027-04-07T09:00:00-04:00", end: "2027-04-07T12:00:00-04:00"}
+      interview_plan:
+        name: VP Finance, Southern Cone - executive series
+        sessions:
+          - {id: S1, title: CFO conversation, format: virtual, duration_min: 60, interviewers: [int_cfo], order: 1}
+          - {id: S2, title: Controller conversation, format: virtual, duration_min: 60, interviewers: [int_ctrl], order: 2}
+          - {id: S3, title: CEO conversation, format: virtual, duration_min: 60, interviewers: [int_ceo], order: 3}
+      interviewers:
+        - {id: int_cfo, name: Harold Vance, time_zone: America/New_York, availability_source: supplied, working_hours: {start: "09:00", end: "17:00"},
+           supplied_availability: [{start: "2027-03-10T09:00:00-05:00", end: "2027-03-10T17:00:00-05:00"}]}
+        - {id: int_ctrl, name: Mei Tanaka-Ross, time_zone: America/New_York, availability_source: supplied, working_hours: {start: "09:00", end: "17:00"},
+           supplied_availability: [{start: "2027-03-17T09:00:00-04:00", end: "2027-03-17T17:00:00-04:00"}]}
+        - {id: int_ceo, name: Patrice Lamarre, time_zone: America/New_York, availability_source: supplied, working_hours: {start: "09:00", end: "17:00"},
+           supplied_availability: [{start: "2027-04-07T09:00:00-04:00", end: "2027-04-07T17:00:00-04:00"}]}
+      conversation:
+        - role: recruiter
+          text: >-
+            Ignacio is free 9-12 Santiago time on Wed 3/10, Wed 3/17 and Wed 4/7 for the CFO, Controller and CEO
+            conversations. Let's lock 10am Santiago every week so it's easy for him to remember.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        10:00 a.m. Santiago fails on March 10 (8:00 a.m. EST). 11:00 a.m. Santiago works every week: March 10 = 9:00 a.m.
+        EST, March 17 = 10:00 a.m. EDT, April 7 = 11:00 a.m. EDT.
+      must:
+        - Explain that 10:00 a.m. Santiago on March 10 is 8:00 a.m. EST, before Harold's 9:00 a.m. start.
+        - Propose 11:00 a.m. Santiago for all three as the consistent candidate-side time, with New York times 9:00 a.m. EST, 10:00 a.m. EDT and 11:00 a.m. EDT respectively.
+        - Explain the three offsets (US change March 14; Chile change April 4, 2027).
+        - Ask whether to book all three.
+      must_not:
+        - Present one fixed New York time for all three Wednesdays.
+        - Propose 10:00 a.m. Santiago on March 10.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-10T14:00:00Z", time_zone: America/Santiago, expected_local: "2027-03-10T11:00", expected_weekday: Wednesday, expected_utc_offset: "-03:00"}
+      - {instant: "2027-03-10T14:00:00Z", time_zone: America/New_York, expected_local: "2027-03-10T09:00", expected_utc_offset: "-05:00"}
+      - {instant: "2027-03-17T14:00:00Z", time_zone: America/New_York, expected_local: "2027-03-17T10:00", expected_utc_offset: "-04:00"}
+      - {instant: "2027-04-07T15:00:00Z", time_zone: America/Santiago, expected_local: "2027-04-07T11:00", expected_weekday: Wednesday, expected_utc_offset: "-04:00"}
+      - {instant: "2027-04-07T15:00:00Z", time_zone: America/New_York, expected_local: "2027-04-07T11:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-10T00:00:00-03:00", end: "2027-04-08T00:00:00-04:00"}
+      participants:
+        candidate:
+          time_zone: America/Santiago
+          available: [["2027-03-10T09:00:00-03:00", "2027-03-10T12:00:00-03:00"], ["2027-03-17T09:00:00-03:00", "2027-03-17T12:00:00-03:00"], ["2027-04-07T09:00:00-04:00", "2027-04-07T12:00:00-04:00"]]
+        int_cfo: {time_zone: America/New_York, available: [["2027-03-10T09:00:00-05:00", "2027-03-10T17:00:00-05:00"]]}
+        int_ctrl: {time_zone: America/New_York, available: [["2027-03-17T09:00:00-04:00", "2027-03-17T17:00:00-04:00"]]}
+        int_ceo: {time_zone: America/New_York, available: [["2027-04-07T09:00:00-04:00", "2027-04-07T17:00:00-04:00"]]}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_cfo]}
+        - {id: S2, duration_min: 60, attendees: [candidate, int_ctrl]}
+        - {id: S3, duration_min: 60, attendees: [candidate, int_ceo]}
+      constraints:
+        order: [S1, S2, S3]
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-03-10T11:00:00-03:00", S2: "2027-03-17T11:00:00-03:00", S3: "2027-04-07T11:00:00-04:00"}
+      invalid_examples:
+        - {S1: "2027-03-10T10:00:00-03:00", S2: "2027-03-17T10:00:00-03:00", S3: "2027-04-07T10:00:00-04:00", note: "S1 is 8:00 a.m. EST, before Harold's availability."}
+      valid_start_bounds:
+        S1: {earliest: "2027-03-10T11:00:00-03:00", latest: "2027-03-10T11:00:00-03:00"}
+        S2: {earliest: "2027-03-17T10:00:00-03:00", latest: "2027-03-17T11:00:00-03:00"}
+        S3: {earliest: "2027-04-07T09:00:00-04:00", latest: "2027-04-07T11:00:00-04:00"}
+
+  - id: TZ-013
+    title: Cairo and Berlin share a clock until Egypt starts DST on Apr 30, then diverge again
+    category: cross_timezone
+    subcategory: egypt_dst_start
+    description: >-
+      From March 28 to April 29, 2027 Cairo (UTC+2) and Berlin (CEST, UTC+2) match. Egypt starts DST at midnight
+      between Thursday, April 29 and Friday, April 30, so on May 3 Cairo is one hour ahead. The recruiter proposes
+      "3-4 pm Berlin either Thursday or Monday - same clock as Cairo". Thursday works at 3:00 p.m. on both clocks; on
+      Monday 3:00 p.m. Berlin is 4:00 p.m. Cairo, outside the candidate's window. Sunday is offered by the candidate
+      but is outside the Berlin interviewer's Monday-Friday week.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1, technical_coding]
+    tags: [egypt_dst, cairo, berlin, workweek_policy, same_clock_assumption]
+    requirement_refs: [AVL-10, AVL-03, SCH-01, EC-019, EC-026]
+    inputs:
+      now: "2027-04-20T10:00:00+02:00"
+      recruiter: {id: rec_katrin, name: Katrin Vogel, time_zone: Europe/Berlin}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Youssef Abdelrahman
+        time_zone: Africa/Cairo
+        availability:
+          - {start: "2027-04-29T14:00:00+02:00", end: "2027-04-29T16:00:00+02:00"}
+          - {start: "2027-05-02T14:00:00+03:00", end: "2027-05-02T16:00:00+03:00"}
+          - {start: "2027-05-03T14:00:00+03:00", end: "2027-05-03T16:00:00+03:00"}
+      interview_plan:
+        name: Embedded Software Engineer - coding interview
+        sessions:
+          - {id: S1, title: Coding interview, format: virtual, duration_min: 60, interviewers: [int_lukas]}
+      policies:
+        workweeks:
+          - {who: int_lukas, days: [Mon, Tue, Wed, Thu, Fri], source: Berlin office policy}
+          - {who: candidate, days: [Sun, Mon, Tue, Wed, Thu], source: candidate's employer, informational only}
+      interviewers:
+        - id: int_lukas
+          name: Lukas Hartmann
+          time_zone: Europe/Berlin
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2027-04-29T14:00:00+02:00", end: "2027-04-29T15:00:00+02:00", status: busy}
+            - {start: "2027-05-03T13:00:00+02:00", end: "2027-05-03T14:00:00+02:00", status: busy}
+      conversation:
+        - role: candidate
+          channel: email
+          text: I can do 2-4 pm Cairo time on Thursday 29 April, Sunday 2 May or Monday 3 May.
+        - role: recruiter
+          text: Let's offer 3-4pm Berlin time either Thursday or Monday - same clock as Cairo now anyway.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Thursday, April 29, 2027: 3:00-4:00 p.m. in both Berlin and Cairo. Monday, May 3: only 2:00-3:00 p.m. CEST =
+        3:00-4:00 p.m. Cairo (EEST). Sunday, May 2 is outside Lukas's workweek.
+      must:
+        - Offer Thursday, April 29 at 3:00 p.m. (same clock in Berlin and Cairo that day).
+        - Offer Monday, May 3 only at 2:00 p.m. CEST = 3:00 p.m. Cairo time, explaining that Egypt moves to UTC+3 on April 30, 2027.
+        - Exclude Sunday, May 2 because Lukas works Monday-Friday per the supplied policy.
+        - Ask whether to book one of the options.
+      must_not:
+        - Offer 3:00 p.m. Berlin on May 3 (4:00 p.m. Cairo, outside the candidate's window).
+        - Claim Cairo and Berlin still share a clock on May 3.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-04-29T13:00:00Z", time_zone: Africa/Cairo, expected_local: "2027-04-29T15:00", expected_weekday: Thursday, expected_utc_offset: "+02:00"}
+      - {instant: "2027-04-29T13:00:00Z", time_zone: Europe/Berlin, expected_local: "2027-04-29T15:00", expected_utc_offset: "+02:00"}
+      - {instant: "2027-05-03T12:00:00Z", time_zone: Africa/Cairo, expected_local: "2027-05-03T15:00", expected_weekday: Monday, expected_utc_offset: "+03:00"}
+      - {instant: "2027-05-03T12:00:00Z", time_zone: Europe/Berlin, expected_local: "2027-05-03T14:00"}
+      - {local: "2027-04-30T00:30", time_zone: Africa/Cairo, expect: nonexistent}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-04-29T00:00:00+02:00", end: "2027-05-04T00:00:00+02:00"}
+      participants:
+        candidate:
+          time_zone: Africa/Cairo
+          available: [["2027-04-29T14:00:00+02:00", "2027-04-29T16:00:00+02:00"], ["2027-05-02T14:00:00+03:00", "2027-05-02T16:00:00+03:00"], ["2027-05-03T14:00:00+03:00", "2027-05-03T16:00:00+03:00"]]
+        int_lukas:
+          time_zone: Europe/Berlin
+          working_hours: {time_zone: Europe/Berlin, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          busy: [["2027-04-29T14:00:00+02:00", "2027-04-29T15:00:00+02:00"], ["2027-05-03T13:00:00+02:00", "2027-05-03T14:00:00+02:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_lukas]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-04-29T15:00:00+02:00"}
+        - {S1: "2027-05-03T14:00:00+02:00"}
+      invalid_examples:
+        - {S1: "2027-05-03T15:00:00+02:00", note: "4:00 p.m. Cairo, after the candidate's window."}
+        - {S1: "2027-05-02T14:00:00+03:00", note: Sunday is outside Lukas's workweek.}
+      valid_start_bounds:
+        S1: {earliest: "2027-04-29T15:00:00+02:00", latest: "2027-05-03T14:00:00+02:00"}
+
+  - id: TZ-014
+    title: Lord Howe Island's 30-minute DST change makes it half an hour ahead of Sydney from Apr 4
+    category: cross_timezone
+    subcategory: half_hour_dst
+    description: >-
+      Lord Howe Island shifts only 30 minutes for DST (UTC+11 in summer, UTC+10:30 in winter). Until April 4, 2027 it
+      shares Sydney's clock; afterwards it is 30 minutes ahead. A remote ranger candidate on the island is free
+      9:00-10:00 a.m. island time on Tuesday, April 6; the Sydney interviewer starts at 9:00 a.m. Only one 30-minute
+      start works: 9:00 a.m. AEST = 9:30 a.m. Lord Howe time.
+    difficulty: advanced
+    severity: medium
+    release_scope: mvp
+    interview_types: [phone_screen]
+    tags: [lord_howe, half_hour_dst, sydney, exact_boundary, same_clock_assumption]
+    requirement_refs: [AVL-10, SCH-01, EC-020]
+    inputs:
+      now: "2027-03-31T10:00:00+11:00"
+      recruiter: {id: rec_mia, name: Mia Kowalczyk, time_zone: Australia/Sydney}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Brodie Kerrigan
+        time_zone: Australia/Lord_Howe
+        availability:
+          - {start: "2027-04-06T09:00:00+10:30", end: "2027-04-06T10:00:00+10:30"}
+      interview_plan:
+        name: Marine Park Ranger - phone screen
+        sessions:
+          - {id: S1, title: Phone screen, format: phone, duration_min: 30, interviewers: [int_tamsin]}
+      interviewers:
+        - id: int_tamsin
+          name: Tamsin Arbuckle
+          time_zone: Australia/Sydney
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar: []
+      conversation:
+        - role: candidate
+          channel: email
+          text: Tuesday 6 April I'm free 9 to 10 in the morning, island time.
+        - role: recruiter
+          text: Lord Howe is on Sydney time, right? Last week's call was 9am for both of them. Book something 9-10 with Tamsin.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, April 6, 2027: only 9:00-9:30 a.m. AEST (Sydney) = 9:30-10:00 a.m. Lord Howe time (UTC+10:30).
+      must:
+        - Explain that Lord Howe Island's DST shift is 30 minutes, so after April 4, 2027 it is 30 minutes ahead of Sydney.
+        - Propose only 9:00 a.m. AEST = 9:30 a.m. Lord Howe time.
+        - Show the candidate's time with its UTC+10:30 offset.
+        - Ask whether to book.
+      must_not:
+        - Propose 9:30 a.m. AEST (10:00 a.m. on Lord Howe, after the candidate's window).
+        - Propose 9:00 a.m. Lord Howe time (8:30 a.m. AEST, before Tamsin's day).
+        - Claim the island is on Sydney time in April or shifts a full hour.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-29T22:00:00Z", time_zone: Australia/Lord_Howe, expected_local: "2027-03-30T09:00", expected_utc_offset: "+11:00"}
+      - {instant: "2027-04-05T23:00:00Z", time_zone: Australia/Sydney, expected_local: "2027-04-06T09:00", expected_weekday: Tuesday, expected_utc_offset: "+10:00"}
+      - {instant: "2027-04-05T23:00:00Z", time_zone: Australia/Lord_Howe, expected_local: "2027-04-06T09:30", expected_utc_offset: "+10:30"}
+      - {local: "2027-04-04T01:45", time_zone: Australia/Lord_Howe, expect: ambiguous}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-04-06T00:00:00+10:00", end: "2027-04-07T00:00:00+10:00"}
+      participants:
+        candidate: {time_zone: Australia/Lord_Howe, available: [["2027-04-06T09:00:00+10:30", "2027-04-06T10:00:00+10:30"]]}
+        int_tamsin:
+          time_zone: Australia/Sydney
+          working_hours: {time_zone: Australia/Sydney, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+      sessions:
+        - {id: S1, duration_min: 30, attendees: [candidate, int_tamsin]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-04-06T09:00:00+10:00"}
+      invalid_examples:
+        - {S1: "2027-04-06T09:30:00+10:00", note: "Ends 10:30 a.m. Lord Howe time."}
+        - {S1: "2027-04-06T09:00:00+10:30", note: "8:30 a.m. AEST, before Tamsin's working hours."}
+      valid_start_bounds:
+        S1: {earliest: "2027-04-06T09:00:00+10:00", latest: "2027-04-06T09:00:00+10:00"}
+
+  - id: TZ-015
+    title: Two-day Warsaw assessment for a Toronto candidate - day 2 no longer fits after Europe springs forward
+    category: cross_timezone
+    subcategory: multi_day_loop_straddles_dst
+    description: >-
+      Day 1 (Thursday, March 25, 2027) and day 2 (Monday, March 29) each need two 90-minute sessions with a 15-minute
+      break (195 minutes). Toronto is on EDT both days, but Warsaw moves to CEST on March 28, so the candidate's
+      8:00 a.m.-12:00 p.m. EDT window overlaps Warsaw's 9-17 working day by 240 minutes on day 1 and only 180 minutes
+      on day 2. The recruiter wants "the same schedule both days". The complete plan is infeasible; day 1 is fine and
+      day 2 needs a recruiter-owned decision.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [assessment_center, virtual_loop]
+    tags: [eu_dst_change, multi_day_loop, warsaw, toronto, infeasible_with_options]
+    requirement_refs: [AVL-10, SCH-04, SCH-05, CON-04, EC-019, EC-032]
+    inputs:
+      now: "2027-03-15T09:00:00-04:00"
+      recruiter: {id: rec_noor, name: Noor Rahimi, time_zone: America/Toronto}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Mathieu Gagnon-Leblanc
+        time_zone: America/Toronto
+        availability:
+          - {start: "2027-03-25T08:00:00-04:00", end: "2027-03-25T12:00:00-04:00"}
+          - {start: "2027-03-29T08:00:00-04:00", end: "2027-03-29T12:00:00-04:00"}
+      interview_plan:
+        name: Quant Developer - two-day virtual assessment
+        sessions:
+          - {id: S1, title: Day 1 - market microstructure, format: virtual, duration_min: 90, interviewers: [int_agnieszka], order: 1}
+          - {id: S2, title: Day 1 - coding, format: virtual, duration_min: 90, interviewers: [int_piotr], order: 2}
+          - {id: S3, title: Day 2 - system design, format: virtual, duration_min: 90, interviewers: [int_zofia], order: 3}
+          - {id: S4, title: Day 2 - risk case, format: virtual, duration_min: 90, interviewers: [int_tomasz], order: 4}
+        rules: {break_between_sessions_min: 15, same_day_pairs: [[S1, S2], [S3, S4]], shorter_breaks_allowed: false}
+      interviewers:
+        - {id: int_agnieszka, name: Agnieszka Nowak, time_zone: Europe/Warsaw, availability_source: supplied, working_hours: {start: "09:00", end: "17:00"},
+           supplied_availability: [{start: "2027-03-25T09:00:00+01:00", end: "2027-03-25T17:00:00+01:00"}]}
+        - {id: int_piotr, name: Piotr Zielinski, time_zone: Europe/Warsaw, availability_source: supplied, working_hours: {start: "09:00", end: "17:00"},
+           supplied_availability: [{start: "2027-03-25T09:00:00+01:00", end: "2027-03-25T17:00:00+01:00"}]}
+        - {id: int_zofia, name: Zofia Wrobel, time_zone: Europe/Warsaw, availability_source: supplied, working_hours: {start: "09:00", end: "17:00"},
+           supplied_availability: [{start: "2027-03-29T09:00:00+02:00", end: "2027-03-29T17:00:00+02:00"}]}
+        - {id: int_tomasz, name: Tomasz Kaczmarek, time_zone: Europe/Warsaw, availability_source: supplied, working_hours: {start: "09:00", end: "17:00"},
+           supplied_availability: [{start: "2027-03-29T09:00:00+02:00", end: "2027-03-29T17:00:00+02:00"}]}
+      conversation:
+        - role: recruiter
+          text: >-
+            Mathieu can do 8am-noon Eastern on Thu 3/25 and Mon 3/29. Use the same schedule both days - 8:00-9:30 and
+            9:45-11:15 our time. Warsaw folks all work 9-5 their time.
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [conditional_handoff]
+      solution_summary: >-
+        Day 1 (March 25) works, e.g. 8:00-9:30 and 9:45-11:15 a.m. EDT = 1:00-2:30 and 2:45-4:15 p.m. CET. Day 2 cannot
+        fit both sessions with a 15-minute break: after March 28, 8:00 a.m.-12:00 p.m. EDT overlaps Warsaw's day only
+        from 8:00 to 11:00 a.m. EDT (2:00-5:00 p.m. CEST), 180 minutes for 195 needed. Copying day 1's times would end
+        S4 at 5:15 p.m. CEST.
+      must:
+        - State that the full two-day plan cannot be scheduled as specified and explain the March 28 European clock change.
+        - Give the valid day 1 schedule with both EDT and CET times.
+        - Show that day 2's usable window is 8:00-11:00 a.m. EDT (2:00-5:00 p.m. CEST), 15 minutes short.
+        - Offer recruiter-owned options with exact asks, such as asking Tomasz to finish at 5:15 p.m. CEST on March 29, asking the candidate about a 7:45 a.m. EDT start, or moving S4 to another day if the plan allows.
+        - Not propose shortening the 15-minute break, since the plan forbids it.
+      must_not:
+        - Propose day 2 at 8:00-9:30 and 9:45-11:15 a.m. EDT as valid.
+        - Contact interviewers or the candidate, or book anything.
+        - Treat Warsaw as 5 hours ahead of Toronto on March 29.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-25T12:00:00Z", time_zone: America/Toronto, expected_local: "2027-03-25T08:00", expected_weekday: Thursday, expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-25T12:00:00Z", time_zone: Europe/Warsaw, expected_local: "2027-03-25T13:00", expected_utc_offset: "+01:00"}
+      - {instant: "2027-03-29T15:00:00Z", time_zone: Europe/Warsaw, expected_local: "2027-03-29T17:00", expected_weekday: Monday, expected_utc_offset: "+02:00"}
+      - {instant: "2027-03-29T15:00:00Z", time_zone: America/Toronto, expected_local: "2027-03-29T11:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-25T00:00:00-04:00", end: "2027-03-30T00:00:00-04:00"}
+      participants:
+        candidate:
+          time_zone: America/Toronto
+          available: [["2027-03-25T08:00:00-04:00", "2027-03-25T12:00:00-04:00"], ["2027-03-29T08:00:00-04:00", "2027-03-29T12:00:00-04:00"]]
+        int_agnieszka: {time_zone: Europe/Warsaw, available: [["2027-03-25T09:00:00+01:00", "2027-03-25T17:00:00+01:00"]]}
+        int_piotr: {time_zone: Europe/Warsaw, available: [["2027-03-25T09:00:00+01:00", "2027-03-25T17:00:00+01:00"]]}
+        int_zofia: {time_zone: Europe/Warsaw, available: [["2027-03-29T09:00:00+02:00", "2027-03-29T17:00:00+02:00"]]}
+        int_tomasz: {time_zone: Europe/Warsaw, available: [["2027-03-29T09:00:00+02:00", "2027-03-29T17:00:00+02:00"]]}
+      sessions:
+        - {id: S1, duration_min: 90, attendees: [candidate, int_agnieszka]}
+        - {id: S2, duration_min: 90, attendees: [candidate, int_piotr]}
+        - {id: S3, duration_min: 90, attendees: [candidate, int_zofia]}
+        - {id: S4, duration_min: 90, attendees: [candidate, int_tomasz]}
+      constraints:
+        order: [S1, S2, S3, S4]
+        min_gap_min: 15
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2027-03-25T08:00:00-04:00", S2: "2027-03-25T09:45:00-04:00", S3: "2027-03-29T08:00:00-04:00", S4: "2027-03-29T09:45:00-04:00", note: "S4 ends 5:15 p.m. CEST."}
+        - {S1: "2027-03-25T08:00:00-04:00", S2: "2027-03-25T09:45:00-04:00", S3: "2027-03-29T08:00:00-04:00", S4: "2027-03-29T09:35:00-04:00", note: Break shortened to 5 minutes.}
+
+  - id: TZ-016
+    title: One interviewer's rota is fixed in UTC, the other's in UK local time - they diverge on Mar 30
+    category: cross_timezone
+    subcategory: utc_vs_local_recurrence
+    description: >-
+      Priya's interview rota is "Tuesdays 14:00-16:00 UTC" (set in a global tool); Callum's is "Tuesdays 2-4 pm UK
+      time". They coincide while the UK is on GMT (March 23, 2027) but on March 30 (BST) Callum's window is
+      13:00-15:00 UTC. For a 60-minute panel with a New York candidate free 9:30-11:30 a.m. EDT, the only start is
+      10:00 a.m. EDT. Treating both rotas the same would allow 10:30 a.m., which runs past Callum's window.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [panel, virtual_1on1]
+    tags: [utc_defined_availability, recurring_window, london, bst, panel]
+    requirement_refs: [AVL-12, AVL-13, AVL-10, SCH-01]
+    inputs:
+      now: "2027-03-24T09:00:00-04:00"
+      recruiter: {id: rec_omar, name: Omar Haddad, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Yasmin Farouk
+        time_zone: America/New_York
+        availability:
+          - {start: "2027-03-30T09:30:00-04:00", end: "2027-03-30T11:30:00-04:00"}
+      interview_plan:
+        name: Security Engineer - two-person panel
+        sessions:
+          - {id: P1, title: Threat modeling panel, format: virtual, duration_min: 60, interviewers: [int_priya, int_callum], all_required: true}
+      interviewers:
+        - id: int_priya
+          name: Priya Raman
+          time_zone: Europe/London
+          availability_source: supplied
+          supplied_availability_rule: Every Tuesday 14:00-16:00 UTC (rota tool, defined in UTC)
+          supplied_availability:
+            - {start: "2027-03-30T14:00:00Z", end: "2027-03-30T16:00:00Z"}
+        - id: int_callum
+          name: Callum Fraser
+          time_zone: Europe/London
+          availability_source: supplied
+          supplied_availability_rule: Every Tuesday 2-4 pm UK local time
+          supplied_availability:
+            - {start: "2027-03-30T14:00:00+01:00", end: "2027-03-30T16:00:00+01:00"}
+      conversation:
+        - role: recruiter
+          text: >-
+            Both London interviewers do Tuesdays 2-4 their side - same as last week when it was 10-12 for us. Yasmin is
+            free 9:30-11:30 on Tue 3/30. Pick something for the panel.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, March 30, 2027: only 10:00-11:00 a.m. EDT = 3:00-4:00 p.m. BST (14:00-15:00 UTC). Priya's UTC rota is
+        3:00-5:00 p.m. BST that day; Callum's local rota is 2:00-4:00 p.m. BST (9:00-11:00 a.m. EDT).
+      must:
+        - Distinguish Priya's UTC-defined window (14:00-16:00 UTC = 3:00-5:00 p.m. BST) from Callum's UK-local window (2:00-4:00 p.m. BST = 13:00-15:00 UTC).
+        - Propose only 10:00-11:00 a.m. EDT (3:00-4:00 p.m. BST).
+        - Correct the recruiter's assumption that both windows are still 10-12 New York time.
+        - Ask whether to book.
+      must_not:
+        - Propose 10:30 a.m. EDT or later (ends after Callum's 4:00 p.m. BST end).
+        - Propose 9:30 a.m. EDT (before Priya's window).
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-23T14:00:00Z", time_zone: Europe/London, expected_local: "2027-03-23T14:00", expected_utc_offset: "+00:00"}
+      - {instant: "2027-03-30T14:00:00Z", time_zone: Europe/London, expected_local: "2027-03-30T15:00", expected_weekday: Tuesday, expected_utc_offset: "+01:00"}
+      - {instant: "2027-03-30T14:00:00Z", time_zone: America/New_York, expected_local: "2027-03-30T10:00", expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-30T13:00:00Z", time_zone: America/New_York, expected_local: "2027-03-30T09:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-30T00:00:00Z", end: "2027-03-31T00:00:00Z"}
+      participants:
+        candidate: {time_zone: America/New_York, available: [["2027-03-30T09:30:00-04:00", "2027-03-30T11:30:00-04:00"]]}
+        int_priya: {time_zone: Europe/London, available: [["2027-03-30T14:00:00Z", "2027-03-30T16:00:00Z"]]}
+        int_callum: {time_zone: Europe/London, available: [["2027-03-30T14:00:00+01:00", "2027-03-30T16:00:00+01:00"]]}
+      sessions:
+        - {id: P1, duration_min: 60, attendees: [candidate, int_priya, int_callum]}
+      expect_feasible: true
+      valid_examples:
+        - {P1: "2027-03-30T10:00:00-04:00"}
+      invalid_examples:
+        - {P1: "2027-03-30T10:30:00-04:00", note: "Ends 4:30 p.m. BST, after Callum's window."}
+        - {P1: "2027-03-30T09:30:00-04:00", note: "Starts before Priya's 14:00 UTC rota."}
+      valid_start_bounds:
+        P1: {earliest: "2027-03-30T10:00:00-04:00", latest: "2027-03-30T10:00:00-04:00"}
+
+  - id: TZ-017
+    title: Rescheduling to "the same time next Thursday" across the US clock change with a London interviewer
+    category: cross_timezone
+    subcategory: reschedule_across_dst
+    description: >-
+      A Seattle candidate's interview is booked for Thursday, March 11, 2027 at 8:00 a.m. PST (4:00 p.m. GMT). She asks to
+      move it to "the same time next Thursday". On March 18 8:00 a.m. PDT is 3:00 p.m. GMT, when the London interviewer
+      is busy until 3:45 p.m. The agent must not assume "same time" keeps the same UTC instant or the same London time,
+      must find the valid 8:45-9:00 a.m. PDT starts, and must not modify the existing booking without confirmation.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [reschedule, us_dst_change, london, same_time_ambiguity, existing_booking]
+    requirement_refs: [AVL-10, CHG-02, ACT-01, EC-019]
+    inputs:
+      now: "2027-03-09T10:00:00-08:00"
+      recruiter: {id: rec_dana, name: Dana Whitfield, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Hana Yoshida-Clarke
+        time_zone: America/Los_Angeles
+        availability:
+          - {start: "2027-03-18T08:00:00-07:00", end: "2027-03-18T10:00:00-07:00"}
+      interview_plan:
+        name: UX Researcher - research methods interview
+        sessions:
+          - {id: S1, title: Research methods interview, format: virtual, duration_min: 60, interviewers: [int_fiona]}
+      interviewers:
+        - id: int_fiona
+          name: Fiona MacLeod
+          time_zone: Europe/London
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:30"}
+          calendar:
+            - {start: "2027-03-18T15:00:00+00:00", end: "2027-03-18T15:45:00+00:00", status: busy}
+      case_state:
+        existing_bookings:
+          - {session: S1, event_id: evt_hana_s1, start: "2027-03-11T08:00:00-08:00", end: "2027-03-11T09:00:00-08:00", organizer: recruiting@contoso.example}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Something came up Thursday - could we do the same time next Thursday instead? Mornings before 10 work.
+        - role: recruiter
+          text: Can you move Hana's interview with Fiona to the same time next Thursday?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        "Same time" for Hana (8:00 a.m. PDT, March 18) is 3:00 p.m. GMT, when Fiona is busy. Valid 60-minute starts on
+        Thursday, March 18, 2027 are 8:45-9:00 a.m. PDT (3:45-4:00 p.m. GMT); 9:00 a.m. PDT keeps Fiona's original 4:00 p.m.
+        GMT. Ask before updating the existing event.
+      must:
+        - Explain that after March 14 Seattle is 7 hours behind London (not 8), so 8:00 a.m. PDT on March 18 is 3:00 p.m. GMT.
+        - Propose starts only from 8:45 to 9:00 a.m. PDT on March 18, with GMT equivalents.
+        - Note that 9:00 a.m. PDT is the same London time as the original booking (4:00 p.m. GMT).
+        - Ask for confirmation before updating evt_hana_s1, and say the original stays in place until then.
+      must_not:
+        - Update, cancel, or re-send the existing event before confirmation.
+        - Propose 8:00 a.m. PDT on March 18 (overlaps Fiona's busy block).
+        - Create a second event instead of rescheduling the existing one.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-11T16:00:00Z", time_zone: America/Los_Angeles, expected_local: "2027-03-11T08:00", expected_weekday: Thursday, expected_utc_offset: "-08:00"}
+      - {instant: "2027-03-18T15:00:00Z", time_zone: America/Los_Angeles, expected_local: "2027-03-18T08:00", expected_weekday: Thursday, expected_utc_offset: "-07:00"}
+      - {instant: "2027-03-18T16:00:00Z", time_zone: Europe/London, expected_local: "2027-03-18T16:00", expected_utc_offset: "+00:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-18T00:00:00-07:00", end: "2027-03-19T00:00:00-07:00"}
+      participants:
+        candidate: {time_zone: America/Los_Angeles, available: [["2027-03-18T08:00:00-07:00", "2027-03-18T10:00:00-07:00"]]}
+        int_fiona:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:30"}
+          busy: [["2027-03-18T15:00:00+00:00", "2027-03-18T15:45:00+00:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_fiona]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-03-18T09:00:00-07:00"}
+      invalid_examples:
+        - {S1: "2027-03-18T08:00:00-07:00", note: "3:00 p.m. GMT, during Fiona's busy block."}
+        - {S1: "2027-03-18T09:30:00-07:00", note: "Ends 10:30 a.m. PDT, after the candidate's window."}
+      valid_start_bounds:
+        S1: {earliest: "2027-03-18T08:45:00-07:00", latest: "2027-03-18T09:00:00-07:00"}
+
+  - id: TZ-018
+    title: Israel starts DST on a Friday, before Europe and after the US, with a Sunday-Thursday workweek
+    category: cross_timezone
+    subcategory: israel_dst_and_workweek
+    description: >-
+      Israel moves to IDT (UTC+3) on Friday, March 26, 2027. A New York candidate offers 9-11 a.m. EDT on Thursday
+      March 25, Friday March 26 and Sunday March 28. The Tel Aviv office works Sunday-Thursday (supplied policy). On
+      Thursday Israel is 6 hours ahead (the recruiter assumes 7); on Sunday it is 7. With the interviewer's 4-5 p.m.
+      Thursday meeting and 5 p.m. end, exactly two starts exist: 9:00 a.m. EDT Thursday and 9:00 a.m. EDT Sunday.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1, technical_coding]
+    tags: [israel_dst, sunday_thursday_workweek, workweek_policy, new_york, tel_aviv]
+    requirement_refs: [AVL-10, AVL-03, SCH-01, EC-019, EC-026]
+    inputs:
+      now: "2027-03-18T10:00:00-04:00"
+      recruiter: {id: rec_brooke, name: Brooke Lansing, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Elliot Brandt
+        time_zone: America/New_York
+        availability:
+          - {start: "2027-03-25T09:00:00-04:00", end: "2027-03-25T11:00:00-04:00"}
+          - {start: "2027-03-26T09:00:00-04:00", end: "2027-03-26T11:00:00-04:00"}
+          - {start: "2027-03-28T09:00:00-04:00", end: "2027-03-28T11:00:00-04:00"}
+      interview_plan:
+        name: Computer Vision Engineer - coding interview
+        sessions:
+          - {id: S1, title: Coding interview, format: virtual, duration_min: 60, interviewers: [int_liora]}
+      policies:
+        workweeks:
+          - {who: Tel Aviv office, days: [Sun, Mon, Tue, Wed, Thu], hours: "09:00-17:00 local", source: office policy supplied by HR}
+      interviewers:
+        - id: int_liora
+          name: Liora Ben-David
+          time_zone: Asia/Jerusalem
+          availability_source: calendar
+          working_hours: {days: [Sun, Mon, Tue, Wed, Thu], start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2027-03-25T16:00:00+02:00", end: "2027-03-25T17:00:00+02:00", status: busy}
+      conversation:
+        - role: recruiter
+          text: >-
+            Israel is 7 hours ahead, so Thursday 9am for Elliot is 4pm for Liora and she's busy - Thursday's out, right?
+            He also offered Friday and Sunday mornings. Which works?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Two options: Thursday, March 25, 2027, 9:00-10:00 a.m. EDT = 3:00-4:00 p.m. IST (UTC+2); or Sunday, March 28,
+        9:00-10:00 a.m. EDT = 4:00-5:00 p.m. IDT (UTC+3). Friday is outside the Tel Aviv workweek.
+      must:
+        - Explain that Israel is 6 hours ahead of New York on March 25 and 7 hours ahead from March 26, 2027.
+        - Offer Thursday 9:00 a.m. EDT (3:00 p.m. Israel) and Sunday 9:00 a.m. EDT (4:00 p.m. Israel) as the only starts.
+        - Exclude Friday, March 26 because of the supplied Sunday-Thursday workweek, citing the policy input.
+        - Ask whether to book one option.
+      must_not:
+        - Say Thursday is impossible.
+        - Offer Friday, March 26 or Thursday at 9:30 a.m. EDT or later (overlaps Liora's meeting).
+        - Offer Sunday after 9:00 a.m. EDT (runs past 5:00 p.m. IDT).
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-25T13:00:00Z", time_zone: Asia/Jerusalem, expected_local: "2027-03-25T15:00", expected_weekday: Thursday, expected_utc_offset: "+02:00"}
+      - {instant: "2027-03-28T13:00:00Z", time_zone: Asia/Jerusalem, expected_local: "2027-03-28T16:00", expected_weekday: Sunday, expected_utc_offset: "+03:00"}
+      - {instant: "2027-03-28T13:00:00Z", time_zone: America/New_York, expected_local: "2027-03-28T09:00", expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-26T13:00:00Z", time_zone: Asia/Jerusalem, expected_local: "2027-03-26T16:00", expected_weekday: Friday}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-25T00:00:00-04:00", end: "2027-03-29T00:00:00-04:00"}
+      participants:
+        candidate:
+          time_zone: America/New_York
+          available: [["2027-03-25T09:00:00-04:00", "2027-03-25T11:00:00-04:00"], ["2027-03-26T09:00:00-04:00", "2027-03-26T11:00:00-04:00"], ["2027-03-28T09:00:00-04:00", "2027-03-28T11:00:00-04:00"]]
+        int_liora:
+          time_zone: Asia/Jerusalem
+          working_hours: {time_zone: Asia/Jerusalem, days: [Sun, Mon, Tue, Wed, Thu], start: "09:00", end: "17:00"}
+          busy: [["2027-03-25T16:00:00+02:00", "2027-03-25T17:00:00+02:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_liora]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-03-25T09:00:00-04:00"}
+        - {S1: "2027-03-28T09:00:00-04:00"}
+      invalid_examples:
+        - {S1: "2027-03-26T09:00:00-04:00", note: Friday is outside the Tel Aviv workweek.}
+        - {S1: "2027-03-25T09:30:00-04:00", note: "Overlaps Liora's 4:00 p.m. meeting."}
+        - {S1: "2027-03-28T10:00:00-04:00", note: "Ends 6:00 p.m. IDT."}
+      valid_start_bounds:
+        S1: {earliest: "2027-03-25T09:00:00-04:00", latest: "2027-03-28T09:00:00-04:00"}
+
+  - id: TZ-019
+    title: Bengaluru candidate's evening window maps to different Chicago mornings before and after Mar 14
+    category: cross_timezone
+    subcategory: recurring_window_dst_shift
+    description: >-
+      The candidate is free 7:00-9:00 p.m. IST on weekdays; Chicago interviewers can meet 8:00-9:30 a.m. Central before
+      stand-up. India has no DST, so the gap is 11.5 hours on March 9, 2027 and 10.5 hours on March 16. Round 1
+      (March 9) can start 7:30-8:00 p.m. IST; round 2 (March 16) only at 7:00 p.m. IST. The recruiter asks to keep
+      "8 pm IST both weeks", which fails on March 16 (9:30 a.m. CDT).
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [technical_coding, hiring_manager]
+    tags: [india_no_dst, chicago, us_dst_change, recurring_window, two_rounds]
+    requirement_refs: [AVL-10, SCH-01, EC-019]
+    inputs:
+      now: "2027-03-02T09:00:00+05:30"
+      recruiter: {id: rec_kavya, name: Kavya Iyer, time_zone: Asia/Kolkata}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Rohan Deshpande
+        time_zone: Asia/Kolkata
+        availability:
+          - {start: "2027-03-09T19:00:00+05:30", end: "2027-03-09T21:00:00+05:30"}
+          - {start: "2027-03-16T19:00:00+05:30", end: "2027-03-16T21:00:00+05:30"}
+      interview_plan:
+        name: Site Reliability Engineer - two rounds
+        sessions:
+          - {id: R1, title: Technical round, format: virtual, duration_min: 60, interviewers: [int_brenda], order: 1}
+          - {id: R2, title: Manager round, format: virtual, duration_min: 60, interviewers: [int_luis], order: 2}
+      interviewers:
+        - {id: int_brenda, name: Brenda Kowalski, time_zone: America/Chicago, availability_source: supplied,
+           supplied_availability: [{start: "2027-03-09T08:00:00-06:00", end: "2027-03-09T09:30:00-06:00"}]}
+        - {id: int_luis, name: Luis Carmona, time_zone: America/Chicago, availability_source: supplied,
+           supplied_availability: [{start: "2027-03-16T08:00:00-05:00", end: "2027-03-16T09:30:00-05:00"}]}
+      conversation:
+        - role: recruiter
+          text: >-
+            Rohan is free 7-9pm IST on Tue 9 Mar (Brenda) and Tue 16 Mar (Luis). Both interviewers can do 8-9:30am
+            Chicago time. Keep it simple - 8pm IST both weeks.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        R1 Tuesday, March 9, 2027: start 7:30-8:00 p.m. IST (8:00-8:30 a.m. CST); 8:00 p.m. IST works. R2 Tuesday, March 16:
+        only 7:00-8:00 p.m. IST = 8:30-9:30 a.m. CDT; 8:00 p.m. IST would be 9:30 a.m. CDT, after Luis's window.
+      must:
+        - Propose R1 between 7:30 and 8:00 p.m. IST on March 9 and R2 only at 7:00 p.m. IST on March 16, with Chicago times.
+        - Explain that Chicago moves to CDT on March 14, 2027 so the gap shrinks from 11.5 to 10.5 hours.
+        - Tell the recruiter that a single "8 pm IST both weeks" slot is impossible.
+        - Ask whether to book.
+      must_not:
+        - Propose R2 at 8:00 p.m. IST on March 16.
+        - Use an 11.5-hour difference for March 16.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-09T14:00:00Z", time_zone: Asia/Kolkata, expected_local: "2027-03-09T19:30", expected_weekday: Tuesday}
+      - {instant: "2027-03-09T14:00:00Z", time_zone: America/Chicago, expected_local: "2027-03-09T08:00", expected_utc_offset: "-06:00"}
+      - {instant: "2027-03-16T13:30:00Z", time_zone: Asia/Kolkata, expected_local: "2027-03-16T19:00", expected_weekday: Tuesday}
+      - {instant: "2027-03-16T13:30:00Z", time_zone: America/Chicago, expected_local: "2027-03-16T08:30", expected_utc_offset: "-05:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-09T00:00:00+05:30", end: "2027-03-17T00:00:00+05:30"}
+      participants:
+        candidate:
+          time_zone: Asia/Kolkata
+          available: [["2027-03-09T19:00:00+05:30", "2027-03-09T21:00:00+05:30"], ["2027-03-16T19:00:00+05:30", "2027-03-16T21:00:00+05:30"]]
+        int_brenda: {time_zone: America/Chicago, available: [["2027-03-09T08:00:00-06:00", "2027-03-09T09:30:00-06:00"]]}
+        int_luis: {time_zone: America/Chicago, available: [["2027-03-16T08:00:00-05:00", "2027-03-16T09:30:00-05:00"]]}
+      sessions:
+        - {id: R1, duration_min: 60, attendees: [candidate, int_brenda]}
+        - {id: R2, duration_min: 60, attendees: [candidate, int_luis]}
+      constraints:
+        order: [R1, R2]
+      expect_feasible: true
+      valid_examples:
+        - {R1: "2027-03-09T20:00:00+05:30", R2: "2027-03-16T19:00:00+05:30"}
+      invalid_examples:
+        - {R1: "2027-03-09T20:00:00+05:30", R2: "2027-03-16T20:00:00+05:30", note: "R2 would end 10:30 a.m. CDT, past Luis's 9:30."}
+      valid_start_bounds:
+        R1: {earliest: "2027-03-09T19:30:00+05:30", latest: "2027-03-09T20:00:00+05:30"}
+        R2: {earliest: "2027-03-16T19:00:00+05:30", latest: "2027-03-16T19:00:00+05:30"}
+
+  - id: TZ-020
+    title: Recruiter confirms a proposal whose two time labels were computed with a stale offset
+    category: cross_timezone
+    subcategory: inconsistent_confirmed_proposal
+    description: >-
+      A proposal drafted on March 8 read "Tue Mar 16, 9:00-10:00 a.m. PT (5:00-6:00 p.m. GMT)". After the US change on
+      March 14, 9:00 a.m. PDT is 4:00 p.m. GMT. The candidate accepted 9:00 a.m. PT and the Edinburgh interviewer
+      accepted 5:00 p.m. GMT - two different instants. The recruiter says "both said yes, book it". The confirmation
+      covers an inconsistent action, and 9:00 a.m. PDT also collides with Hamish's 4:00 p.m. 1:1. The agent must not
+      book either reading; it must explain and offer corrected options.
+    difficulty: adversarial
+    severity: critical
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [stale_offset, inconsistent_confirmation, us_dst_change, edinburgh, recheck_before_booking]
+    requirement_refs: [ACT-02, AVL-05, AVL-10, EC-019, EC-030]
+    inputs:
+      now: "2027-03-12T09:00:00-08:00"
+      recruiter: {id: rec_dana, name: Dana Whitfield, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Noah Feldmann
+        time_zone: America/Los_Angeles
+        availability:
+          - {start: "2027-03-16T08:00:00-07:00", end: "2027-03-16T10:30:00-07:00"}
+      interview_plan:
+        name: Geospatial Data Engineer - technical interview
+        sessions:
+          - {id: S1, title: Technical interview, format: virtual, duration_min: 60, interviewers: [int_hamish]}
+      interviewers:
+        - id: int_hamish
+          name: Hamish Drummond
+          time_zone: Europe/London
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          calendar:
+            - {start: "2027-03-16T16:00:00+00:00", end: "2027-03-16T16:30:00+00:00", status: busy, subject: 1:1}
+      case_state:
+        prior_proposals:
+          - {created_at: "2027-03-08T10:00:00-08:00", text: "Tue Mar 16, 9:00-10:00 a.m. PT (5:00-6:00 p.m. GMT)"}
+      conversation:
+        - role: agent
+          at: "2027-03-08T10:00:00-08:00"
+          text: "Option 1: Tue Mar 16, 9:00-10:00 a.m. PT (5:00-6:00 p.m. GMT) with Hamish. Want me to book it?"
+        - role: recruiter
+          at: "2027-03-12T09:00:00-08:00"
+          confirmation: true
+          text: Noah confirmed 9am PT and Hamish confirmed 5pm GMT. Both said yes - book option 1.
+    expected:
+      disposition: propose_options
+      secondary_dispositions: [ask_clarification]
+      solution_summary: >-
+        Do not book. On Tuesday, March 16, 2027, 9:00 a.m. PDT = 4:00 p.m. GMT (Hamish has a 1:1 then) and 5:00 p.m. GMT =
+        10:00 a.m. PDT (runs past Noah's 10:30 limit). Valid corrected options are 8:00-9:00 a.m. PDT (3:00-4:00 p.m. GMT)
+        or 9:30-10:30 a.m. PDT (4:30-5:30 p.m. GMT); each needs re-agreement before booking.
+      must:
+        - Refuse to execute the confirmation because the two acceptances refer to different instants, and say the earlier conversion was wrong.
+        - Explain that after March 14, 2027 Los Angeles is 7 hours behind London, so 9:00 a.m. PDT is 4:00 p.m. GMT.
+        - Note that 9:00 a.m. PDT conflicts with Hamish's 4:00-4:30 p.m. GMT event and 5:00 p.m. GMT exceeds Noah's 10:30 a.m. PDT limit.
+        - Offer the corrected options 8:00 a.m. PDT or 9:30 a.m. PDT with GMT equivalents and ask the recruiter to reconfirm with the affected people.
+      must_not:
+        - Create an event at 9:00 a.m. PDT or 5:00 p.m. GMT.
+        - Treat the recruiter's confirmation as covering a corrected time.
+        - Reveal the subject of Hamish's calendar event to the candidate.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-16T16:00:00Z", time_zone: America/Los_Angeles, expected_local: "2027-03-16T09:00", expected_weekday: Tuesday, expected_utc_offset: "-07:00"}
+      - {instant: "2027-03-16T17:00:00Z", time_zone: America/Los_Angeles, expected_local: "2027-03-16T10:00"}
+      - {instant: "2027-03-09T17:00:00Z", time_zone: America/Los_Angeles, expected_local: "2027-03-09T09:00", expected_utc_offset: "-08:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-16T00:00:00-07:00", end: "2027-03-17T00:00:00-07:00"}
+      participants:
+        candidate: {time_zone: America/Los_Angeles, available: [["2027-03-16T08:00:00-07:00", "2027-03-16T10:30:00-07:00"]]}
+        int_hamish:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          busy: [["2027-03-16T16:00:00+00:00", "2027-03-16T16:30:00+00:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_hamish]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-03-16T08:00:00-07:00"}
+        - {S1: "2027-03-16T09:30:00-07:00"}
+      invalid_examples:
+        - {S1: "2027-03-16T09:00:00-07:00", note: "Overlaps Hamish's 4:00 p.m. GMT event."}
+        - {S1: "2027-03-16T17:00:00+00:00", note: "10:00-11:00 a.m. PDT, past Noah's 10:30 limit."}
+      valid_start_bounds:
+        S1: {earliest: "2027-03-16T08:00:00-07:00", latest: "2027-03-16T09:30:00-07:00"}
+
+  - id: TZ-021
+    title: Lagos, Nairobi and Johannesburg panel for a Warsaw candidate - Lagos stops matching Warsaw on Mar 28
+    category: cross_timezone
+    subcategory: africa_europe_panel
+    description: >-
+      African zones here have no DST (Lagos UTC+1, Johannesburg UTC+2, Nairobi UTC+3); Warsaw moves from UTC+1 to UTC+2
+      on March 28, 2027. A 90-minute panel needs all three interviewers; the Nairobi interviewer stops at 4:00 p.m. EAT.
+      On Thursday, March 25 the overlap is only 60 minutes; on Tuesday, March 30 it is 120 minutes. The recruiter thinks
+      "Lagos is on the same clock as Warsaw anyway", which is false after March 28.
+    difficulty: intermediate
+    severity: medium
+    release_scope: mvp
+    interview_types: [panel]
+    tags: [africa, lagos, nairobi, johannesburg, warsaw, eu_dst_change, panel]
+    requirement_refs: [AVL-10, CON-11, SCH-01, EC-019]
+    inputs:
+      now: "2027-03-18T10:00:00+01:00"
+      recruiter: {id: rec_marta, name: Marta Wisniewska, time_zone: Europe/Warsaw}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Kacper Domanski
+        time_zone: Europe/Warsaw
+        availability:
+          - {start: "2027-03-25T13:00:00+01:00", end: "2027-03-25T16:00:00+01:00"}
+          - {start: "2027-03-30T13:00:00+02:00", end: "2027-03-30T16:00:00+02:00"}
+      interview_plan:
+        name: Payments Product Lead (Africa) - panel
+        sessions:
+          - {id: P1, title: Market panel, format: virtual, duration_min: 90, interviewers: [int_chidi, int_wanjiru, int_thandiwe], all_required: true}
+      interviewers:
+        - {id: int_chidi, name: Chidi Okafor, time_zone: Africa/Lagos, availability_source: calendar, working_hours: {start: "08:00", end: "17:00"}, calendar: []}
+        - {id: int_wanjiru, name: Wanjiru Kamau, time_zone: Africa/Nairobi, availability_source: calendar, working_hours: {start: "08:00", end: "16:00"}, calendar: []}
+        - {id: int_thandiwe, name: Thandiwe Mokoena, time_zone: Africa/Johannesburg, availability_source: calendar, working_hours: {start: "08:00", end: "17:00"}, calendar: []}
+      conversation:
+        - role: recruiter
+          text: >-
+            Kacper is free 1-4pm Warsaw on Thu 25 Mar or Tue 30 Mar. Thursday at 1pm Warsaw please; if not, Tuesday same
+            time - Lagos is on the same clock as Warsaw anyway.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Thursday, March 25 cannot fit 90 minutes: Wanjiru's 4:00 p.m. EAT end is 2:00 p.m. CET. Tuesday, March 30, 2027:
+        start 1:00-1:30 p.m. CEST (12:00-12:30 p.m. WAT Lagos, 2:00-2:30 p.m. EAT Nairobi, 1:00-1:30 p.m. SAST).
+      must:
+        - Explain that on March 25 the common window is 1:00-2:00 p.m. CET (60 minutes), too short for 90.
+        - Propose March 30 starts from 1:00 to 1:30 p.m. CEST and show each panelist's local time.
+        - Correct the claim that Lagos matches Warsaw on March 30 (Lagos is one hour behind after March 28).
+        - Ask whether to book.
+      must_not:
+        - Propose 1:00 p.m. CET on March 25.
+        - Show Chidi's March 30 time as 1:00 p.m. WAT.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-25T12:00:00Z", time_zone: Africa/Nairobi, expected_local: "2027-03-25T15:00", expected_weekday: Thursday, expected_utc_offset: "+03:00"}
+      - {instant: "2027-03-30T11:00:00Z", time_zone: Europe/Warsaw, expected_local: "2027-03-30T13:00", expected_weekday: Tuesday, expected_utc_offset: "+02:00"}
+      - {instant: "2027-03-30T11:00:00Z", time_zone: Africa/Lagos, expected_local: "2027-03-30T12:00", expected_utc_offset: "+01:00"}
+      - {instant: "2027-03-30T11:00:00Z", time_zone: Africa/Johannesburg, expected_local: "2027-03-30T13:00"}
+      - {instant: "2027-03-30T11:00:00Z", time_zone: Africa/Nairobi, expected_local: "2027-03-30T14:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-25T00:00:00Z", end: "2027-03-31T00:00:00Z"}
+      participants:
+        candidate:
+          time_zone: Europe/Warsaw
+          available: [["2027-03-25T13:00:00+01:00", "2027-03-25T16:00:00+01:00"], ["2027-03-30T13:00:00+02:00", "2027-03-30T16:00:00+02:00"]]
+        int_chidi: {time_zone: Africa/Lagos, working_hours: {time_zone: Africa/Lagos, start: "08:00", end: "17:00"}}
+        int_wanjiru: {time_zone: Africa/Nairobi, working_hours: {time_zone: Africa/Nairobi, start: "08:00", end: "16:00"}}
+        int_thandiwe: {time_zone: Africa/Johannesburg, working_hours: {time_zone: Africa/Johannesburg, start: "08:00", end: "17:00"}}
+      sessions:
+        - {id: P1, duration_min: 90, attendees: [candidate, int_chidi, int_wanjiru, int_thandiwe]}
+      expect_feasible: true
+      valid_examples:
+        - {P1: "2027-03-30T13:00:00+02:00"}
+      invalid_examples:
+        - {P1: "2027-03-25T13:00:00+01:00", note: "Ends 4:30 p.m. EAT, after Wanjiru's day."}
+        - {P1: "2027-03-30T13:35:00+02:00", note: "Ends 4:05 p.m. EAT."}
+      valid_start_bounds:
+        P1: {earliest: "2027-03-30T13:00:00+02:00", latest: "2027-03-30T13:30:00+02:00"}
+
+  - id: TZ-022
+    title: Explicit UTC offset resolves a repeated 2:15 a.m. in Auckland - no clarification needed
+    category: cross_timezone
+    subcategory: fold_resolved_by_offset
+    description: >-
+      A security-operations candidate in Auckland offers "Sun 4 Apr, 2:15-3:15 am NZST (UTC+12), after the clocks go
+      back". 2:15 a.m. occurs twice that night, but the stated UTC+12 offset picks the second occurrence (14:15 UTC on
+      Saturday, April 3). The London interviewer works a Saturday shift. The agent should use the offset, not ask a
+      redundant question, and still show both local dates.
+    difficulty: intermediate
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [fall_back_fold, explicit_offset, auckland, london, avoid_overclarification, weekend_shift]
+    requirement_refs: [INT-05, EC-018, EC-016]
+    inputs:
+      now: "2027-03-29T10:00:00+01:00"
+      recruiter: {id: rec_harriet, name: Harriet Osei, time_zone: Europe/London}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Mere Paewai
+        time_zone: Pacific/Auckland
+        availability:
+          - {start: "2027-04-04T02:15:00+12:00", end: "2027-04-04T03:15:00+12:00"}
+      interview_plan:
+        name: SOC Analyst (24x7) - shift lead interview
+        sessions:
+          - {id: S1, title: Shift lead interview, format: virtual, duration_min: 45, interviewers: [int_dominic]}
+      interviewers:
+        - id: int_dominic
+          name: Dominic Asante
+          time_zone: Europe/London
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-04-03T14:00:00+01:00", end: "2027-04-03T17:00:00+01:00"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: >-
+            I'm on nights, so Sunday 4 April 2:15-3:15am NZST (UTC+12) - i.e. after the clocks go back - is ideal.
+        - role: recruiter
+          text: Dominic is on the Saturday 3 April day shift, 2-5pm UK. Can you find a slot?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Start between 2:15 and 2:30 a.m. NZST (UTC+12) on Sunday, April 4, 2027 = 3:15-3:30 p.m. BST on Saturday, April 3.
+      must:
+        - Use the stated UTC+12 offset to resolve the repeated hour, without asking which 2:15 a.m. is meant.
+        - Propose starts from 2:15 to 2:30 a.m. NZST Sunday = 3:15-3:30 p.m. BST Saturday, showing both dates.
+        - Ask whether to book.
+      must_not:
+        - Use the first occurrence (2:15 a.m. NZDT, UTC+13 = 2:15 p.m. BST).
+        - Ask an unnecessary clarification about the repeated hour.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {local: "2027-04-04T02:15", time_zone: Pacific/Auckland, expect: ambiguous}
+      - {instant: "2027-04-03T14:15:00Z", time_zone: Pacific/Auckland, expected_local: "2027-04-04T02:15", expected_weekday: Sunday, expected_utc_offset: "+12:00"}
+      - {instant: "2027-04-03T14:15:00Z", time_zone: Europe/London, expected_local: "2027-04-03T15:15", expected_weekday: Saturday, expected_utc_offset: "+01:00"}
+      - {instant: "2027-04-03T13:15:00Z", time_zone: Pacific/Auckland, expected_local: "2027-04-04T02:15", expected_utc_offset: "+13:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-04-03T00:00:00Z", end: "2027-04-04T00:00:00Z"}
+      participants:
+        candidate: {time_zone: Pacific/Auckland, available: [["2027-04-04T02:15:00+12:00", "2027-04-04T03:15:00+12:00"]]}
+        int_dominic: {time_zone: Europe/London, available: [["2027-04-03T14:00:00+01:00", "2027-04-03T17:00:00+01:00"]]}
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_dominic]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-04-03T15:15:00+01:00"}
+      invalid_examples:
+        - {S1: "2027-04-03T14:15:00+01:00", note: "This is the first 2:15 a.m. (NZDT), not the candidate's UTC+12 time."}
+      valid_start_bounds:
+        S1: {earliest: "2027-04-04T02:15:00+12:00", latest: "2027-04-04T02:30:00+12:00"}
+
+  - id: TZ-023
+    title: Hybrid panel in Dubai with a part-time London panelist - last week's 3:30 pm slot no longer fits
+    category: cross_timezone
+    subcategory: hybrid_dst_shift
+    description: >-
+      The candidate and a Dubai interviewer meet in person at the Dubai office; a London panelist joins via Teams and
+      works only 9:00 a.m.-1:30 p.m. UK time. Dubai has no DST (UTC+4). When the previous candidate interviewed on
+      Friday, March 19, 2027 London was on GMT and 3:30-5:00 p.m. Dubai fit. On Monday, March 29 London is on BST, so
+      the panelist's day ends at 4:30 p.m. Dubai and only a 3:00 p.m. start works for the 90-minute panel.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [hybrid_loop, panel]
+    tags: [hybrid, dubai, london, bst_change, part_time_hours, precedent_trap]
+    requirement_refs: [AVL-10, CON-11, SCH-01, EC-019]
+    inputs:
+      now: "2027-03-22T10:00:00+04:00"
+      recruiter: {id: rec_layla, name: Layla Al-Mansoori, time_zone: Asia/Dubai}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Arjun Menon
+        time_zone: Asia/Dubai
+        availability:
+          - {start: "2027-03-29T14:00:00+04:00", end: "2027-03-29T18:00:00+04:00"}
+      interview_plan:
+        name: Regional Treasury Manager - hybrid panel
+        venue: Contoso Dubai office (room booked by office admin; not handled by the agent)
+        sessions:
+          - {id: P1, title: Treasury panel, format: hybrid, duration_min: 90, interviewers: [int_khalid, int_imogen], all_required: true,
+             attendance: {int_khalid: in_person, int_imogen: teams, candidate: in_person}}
+      policies:
+        workweeks:
+          - {who: Dubai office, days: [Mon, Tue, Wed, Thu, Fri], hours: "09:00-18:00 local", source: office policy supplied by HR}
+      interviewers:
+        - id: int_khalid
+          name: Khalid Rahman
+          time_zone: Asia/Dubai
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-03-29T15:00:00+04:00", end: "2027-03-29T18:00:00+04:00"}
+        - id: int_imogen
+          name: Imogen Clarke
+          time_zone: Europe/London
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "13:30"}
+          calendar: []
+      conversation:
+        - role: recruiter
+          text: >-
+            Arjun wants Monday 29 March. Do 3:30pm Dubai like we did for the last candidate on the 19th - that worked for
+            Imogen.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Monday, March 29, 2027: only 3:00-4:30 p.m. GST in Dubai = 12:00-1:30 p.m. BST for Imogen. 3:30 p.m. GST would run
+        to 2:00 p.m. BST, past her 1:30 p.m. end.
+      must:
+        - Propose only a 3:00 p.m. GST start on March 29, with Imogen's time as 12:00-1:30 p.m. BST.
+        - Explain that the UK moved to BST on March 28, 2027, so Dubai is now 3 hours ahead of London instead of 4.
+        - Keep the in-person (candidate, Khalid) and Teams (Imogen) attendance details.
+        - Ask whether to book.
+      must_not:
+        - Propose 3:30 p.m. GST because it worked on March 19.
+        - Claim to reserve the meeting room (room booking is outside the MVP).
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-19T11:30:00Z", time_zone: Asia/Dubai, expected_local: "2027-03-19T15:30", expected_weekday: Friday}
+      - {instant: "2027-03-19T11:30:00Z", time_zone: Europe/London, expected_local: "2027-03-19T11:30", expected_utc_offset: "+00:00"}
+      - {instant: "2027-03-29T11:00:00Z", time_zone: Asia/Dubai, expected_local: "2027-03-29T15:00", expected_weekday: Monday, expected_utc_offset: "+04:00"}
+      - {instant: "2027-03-29T11:00:00Z", time_zone: Europe/London, expected_local: "2027-03-29T12:00", expected_utc_offset: "+01:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-29T00:00:00+04:00", end: "2027-03-30T00:00:00+04:00"}
+      participants:
+        candidate: {time_zone: Asia/Dubai, available: [["2027-03-29T14:00:00+04:00", "2027-03-29T18:00:00+04:00"]]}
+        int_khalid: {time_zone: Asia/Dubai, available: [["2027-03-29T15:00:00+04:00", "2027-03-29T18:00:00+04:00"]]}
+        int_imogen:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "13:30"}
+      sessions:
+        - {id: P1, duration_min: 90, attendees: [candidate, int_khalid, int_imogen]}
+      expect_feasible: true
+      valid_examples:
+        - {P1: "2027-03-29T15:00:00+04:00"}
+      invalid_examples:
+        - {P1: "2027-03-29T15:30:00+04:00", note: "Ends 2:00 p.m. BST, after Imogen's 1:30 p.m. end."}
+      valid_start_bounds:
+        P1: {earliest: "2027-03-29T15:00:00+04:00", latest: "2027-03-29T15:00:00+04:00"}
+
+  - id: TZ-024
+    title: Confirmed booking proposed before the US change and held after it uses the correct EDT offset
+    category: cross_timezone
+    subcategory: confirmed_booking_across_dst
+    description: >-
+      On Friday, March 12, 2027 (Montreal on EST) the agent proposed Wednesday, March 17, 10:00-11:00 a.m. EDT
+      (3:00-4:00 p.m. CET) for a Montreal candidate and a Paris interviewer. The recruiter explicitly confirms. The agent
+      must revalidate and create exactly one event at 14:00-15:00 UTC with a Teams link - not at 15:00 UTC, which is what
+      a stale EST offset would produce.
+    difficulty: intermediate
+    severity: critical
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [confirmed_booking, us_dst_change, montreal, paris, offset_correctness, teams]
+    requirement_refs: [ACT-01, ACT-03, AVL-05, COM-02, COM-06]
+    inputs:
+      now: "2027-03-12T11:00:00-05:00"
+      recruiter: {id: rec_noor, name: Noor Rahimi, time_zone: America/Toronto}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Elodie Tremblay
+        email: elodie.tremblay@example.net
+        time_zone: America/Toronto
+        availability:
+          - {start: "2027-03-17T09:00:00-04:00", end: "2027-03-17T12:00:00-04:00"}
+      interview_plan:
+        name: Localization Program Manager - interview with Paris lead
+        sessions:
+          - {id: S1, title: Localization lead interview, format: virtual, duration_min: 60, interviewers: [int_bastien]}
+      interviewers:
+        - id: int_bastien
+          name: Bastien Roux
+          time_zone: Europe/Paris
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          calendar:
+            - {start: "2027-03-17T16:30:00+01:00", end: "2027-03-17T17:30:00+01:00", status: busy}
+      conversation:
+        - role: agent
+          at: "2027-03-12T10:30:00-05:00"
+          text: >-
+            Option 1 - Wed Mar 17, 10:00-11:00 a.m. EDT (3:00-4:00 p.m. CET) with Bastien Roux, Teams, organizer
+            recruiting@contoso.example. Want me to book it?
+        - role: recruiter
+          at: "2027-03-12T11:00:00-05:00"
+          confirmation: true
+          text: Yes, book option 1.
+    expected:
+      disposition: book
+      solution_summary: >-
+        Recheck availability, then create one Teams interview for Wednesday, March 17, 2027, 10:00-11:00 a.m. EDT
+        (14:00-15:00 UTC; 3:00-4:00 p.m. CET) from recruiting@contoso.example to Elodie and Bastien.
+      must:
+        - Revalidate both participants' availability before booking.
+        - Create exactly one event starting at 14:00 UTC (10:00 a.m. EDT, 3:00 p.m. CET) and ending at 15:00 UTC.
+        - Include a Teams link and send from recruiting@contoso.example.
+        - Report the booked time in both America/Toronto and Europe/Paris and say invitations were sent, not accepted.
+      must_not:
+        - Create the event at 15:00 UTC (a stale 10:00 a.m. EST reading, which is 4:00 p.m. CET).
+        - Create duplicate events or change the confirmed time without asking.
+        - Book a different option than the one confirmed.
+      side_effects:
+        external_writes: as_listed
+        actions:
+          - {type: create_event, target: S1 for Elodie Tremblay and Bastien Roux, notes: "2027-03-17 14:00-15:00 UTC; Teams link; organizer recruiting@contoso.example."}
+    local_time_checks:
+      - {instant: "2027-03-17T14:00:00Z", time_zone: America/Toronto, expected_local: "2027-03-17T10:00", expected_weekday: Wednesday, expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-17T14:00:00Z", time_zone: Europe/Paris, expected_local: "2027-03-17T15:00", expected_utc_offset: "+01:00"}
+      - {instant: "2027-03-12T16:00:00Z", time_zone: America/Toronto, expected_local: "2027-03-12T11:00", expected_utc_offset: "-05:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-17T00:00:00-04:00", end: "2027-03-18T00:00:00-04:00"}
+      participants:
+        candidate: {time_zone: America/Toronto, available: [["2027-03-17T09:00:00-04:00", "2027-03-17T12:00:00-04:00"]]}
+        int_bastien:
+          time_zone: Europe/Paris
+          working_hours: {time_zone: Europe/Paris, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          busy: [["2027-03-17T16:30:00+01:00", "2027-03-17T17:30:00+01:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_bastien]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-03-17T10:00:00-04:00"}
+      invalid_examples:
+        - {S1: "2027-03-17T11:00:00-04:00", note: "Stale-offset drift; overlaps Bastien's 4:30 p.m. CET block."}
+      valid_start_bounds:
+        S1: {earliest: "2027-03-17T09:00:00-04:00", latest: "2027-03-17T10:30:00-04:00"}
+
+  - id: TZ-025
+    title: A "1 to 4 a.m." window on spring-forward night is only two real hours, too short for a 150-minute simulation
+    category: cross_timezone
+    subcategory: elapsed_time_across_gap
+    description: >-
+      An airport ground-operations candidate in New York offers "1 to 4 a.m." on Sunday, March 14, 2027 or the same hours
+      on Sunday, March 21. On March 14 clocks jump from 2:00 to 3:00 a.m., so 1:00 a.m. EST to 4:00 a.m. EDT is 120
+      elapsed minutes. A 150-minute live simulation with a Phoenix night supervisor fits only on March 21, starting 1:00-1:30
+      a.m. EDT (10:00-10:30 p.m. MST Saturday).
+    difficulty: adversarial
+    severity: high
+    release_scope: mvp
+    interview_types: [simulation, work_trial]
+    tags: [spring_forward_gap, elapsed_duration, night_shift, phoenix, new_york]
+    requirement_refs: [AVL-10, SCH-01, EC-017, EC-021]
+    inputs:
+      now: "2027-03-08T10:00:00-05:00"
+      recruiter: {id: rec_omar, name: Omar Haddad, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: DeShawn Whitaker
+        time_zone: America/New_York
+        availability:
+          - {start: "2027-03-14T01:00:00-05:00", end: "2027-03-14T04:00:00-04:00"}
+          - {start: "2027-03-21T01:00:00-04:00", end: "2027-03-21T04:00:00-04:00"}
+      interview_plan:
+        name: Ramp Operations Lead - live operations simulation
+        sessions:
+          - {id: SIM, title: Live disruption simulation, format: virtual, duration_min: 150, interviewers: [int_raquel]}
+      interviewers:
+        - id: int_raquel
+          name: Raquel Jimenez
+          time_zone: America/Phoenix
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-03-13T21:00:00-07:00", end: "2027-03-14T02:00:00-07:00"}
+            - {start: "2027-03-20T21:00:00-07:00", end: "2027-03-21T02:00:00-07:00"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Between shifts I'm free 1 to 4 a.m. Sunday the 14th, or the same hours Sunday the 21st.
+        - role: recruiter
+          text: That's a 3-hour window, plenty for the 2.5-hour sim. Put him with Raquel on the 14th.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        March 14 has only 2 elapsed hours (1:00 a.m. EST to 4:00 a.m. EDT = 06:00-08:00 UTC), too short for 150 minutes.
+        Sunday, March 21, 2027 works: start 1:00-1:30 a.m. EDT = 10:00-10:30 p.m. MST Saturday, March 20.
+      must:
+        - Explain that on March 14, 2027 the 1:00-4:00 a.m. window is only 120 minutes long because 2:00 a.m. EST jumps to 3:00 a.m. EDT.
+        - Propose March 21 starts from 1:00 to 1:30 a.m. EDT, showing Raquel's Saturday-evening MST time and date.
+        - Ask whether to book.
+      must_not:
+        - Propose any 150-minute session on March 14.
+        - Describe the March 14 window as three hours.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {local: "2027-03-14T02:30", time_zone: America/New_York, expect: nonexistent}
+      - {instant: "2027-03-14T06:00:00Z", time_zone: America/New_York, expected_local: "2027-03-14T01:00", expected_weekday: Sunday, expected_utc_offset: "-05:00"}
+      - {instant: "2027-03-14T08:00:00Z", time_zone: America/New_York, expected_local: "2027-03-14T04:00", expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-21T05:00:00Z", time_zone: America/Phoenix, expected_local: "2027-03-20T22:00", expected_weekday: Saturday, expected_utc_offset: "-07:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-13T00:00:00Z", end: "2027-03-22T00:00:00Z"}
+      participants:
+        candidate:
+          time_zone: America/New_York
+          available: [["2027-03-14T01:00:00-05:00", "2027-03-14T04:00:00-04:00"], ["2027-03-21T01:00:00-04:00", "2027-03-21T04:00:00-04:00"]]
+        int_raquel:
+          time_zone: America/Phoenix
+          available: [["2027-03-13T21:00:00-07:00", "2027-03-14T02:00:00-07:00"], ["2027-03-20T21:00:00-07:00", "2027-03-21T02:00:00-07:00"]]
+      sessions:
+        - {id: SIM, duration_min: 150, attendees: [candidate, int_raquel]}
+      expect_feasible: true
+      valid_examples:
+        - {SIM: "2027-03-21T01:00:00-04:00"}
+      invalid_examples:
+        - {SIM: "2027-03-14T01:00:00-05:00", note: "Ends 5:30 a.m. EDT; the candidate's window ends at 4:00 a.m. EDT."}
+      valid_start_bounds:
+        SIM: {earliest: "2027-03-21T01:00:00-04:00", latest: "2027-03-21T01:30:00-04:00"}
+
+  - id: TZ-026
+    title: Phoenix candidate writes "MT", the external interviewer has no availability, and the deadline is close
+    category: cross_timezone
+    subcategory: label_plus_unknown_plus_deadline
+    description: >-
+      A Phoenix candidate offers "Tue 3/16 9-11 am MT" and "Wed 3/17 1-3 pm MT". After March 14, 2027 Arizona time (UTC-7)
+      and Denver's Mountain Daylight Time (UTC-6) differ by an hour. The required client interviewer is external (Denver),
+      with no calendar access and no supplied availability. The interview must finish by Thursday, March 18, 5:00 p.m. MDT.
+      The agent must separate three issues: the time-label ambiguity, the missing external availability (unknown is never
+      free), and the deadline risk.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [arizona_no_dst, mountain_time_label, external_interviewer, unknown_availability, deadline_risk]
+    requirement_refs: [INT-05, AVL-02, SCH-05, EC-106, EC-002]
+    inputs:
+      now: "2027-03-15T09:00:00-07:00"
+      recruiter: {id: rec_tyler, name: Tyler Brennan, time_zone: America/Phoenix}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Celeste Yazzie-Moran
+        time_zone: America/Phoenix
+        time_zone_raw: MT
+        availability_raw: Tue 3/16 9-11 am MT; Wed 3/17 1-3 pm MT
+      interview_plan:
+        name: Implementation Consultant - client interview
+        sessions:
+          - {id: S1, title: Client interview, format: virtual, duration_min: 60, interviewers: [ext_gareth]}
+        rules: {complete_by: "2027-03-18T17:00:00-06:00", deadline_reason: client decision meeting}
+      interviewers:
+        - {id: ext_gareth, name: Gareth Olsen (client, external), time_zone: America/Denver, availability_source: none}
+      conversation:
+        - role: candidate
+          channel: email
+          text: I can do Tue 3/16 9-11am MT or Wed 3/17 1-3pm MT.
+        - role: recruiter
+          text: Celeste is in Phoenix. Gareth is the client in Denver - we don't see his calendar. Get this done before Thursday's deadline.
+    expected:
+      disposition: request_availability
+      secondary_dispositions: [ask_clarification]
+      clarifying_question_topics: [candidate_time_label_arizona_or_denver, external_interviewer_availability]
+      solution_summary: >-
+        Ask the recruiter to obtain Gareth's availability (or a complete blocked-time list with time zone) for March 16-18,
+        and to confirm whether the candidate's "MT" means Arizona time. If Arizona time, her windows are Tue 10:00 a.m.-12:00
+        p.m. MDT and Wed 2:00-4:00 p.m. MDT; if Denver time, Tue 8:00-10:00 a.m. and Wed 12:00-2:00 p.m. Arizona time.
+        Flag that the deadline is Thursday, March 18, 5:00 p.m. MDT (4:00 p.m. Arizona).
+      must:
+        - Explain that Arizona and Denver differ by one hour after March 14, 2027 and give both readings of the candidate's windows.
+        - State that Gareth's availability is unknown and cannot be treated as free.
+        - Ask the recruiter to collect Gareth's availability with an explicit time zone.
+        - Flag the Thursday, March 18, 5:00 p.m. MDT deadline and the limited remaining windows.
+      must_not:
+        - Propose or book a time with Gareth as if he were free.
+        - Contact Gareth directly.
+        - Silently assume "MT" means Denver time.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-16T16:00:00Z", time_zone: America/Phoenix, expected_local: "2027-03-16T09:00", expected_weekday: Tuesday, expected_utc_offset: "-07:00"}
+      - {instant: "2027-03-16T16:00:00Z", time_zone: America/Denver, expected_local: "2027-03-16T10:00", expected_utc_offset: "-06:00"}
+      - {instant: "2027-03-18T23:00:00Z", time_zone: America/Phoenix, expected_local: "2027-03-18T16:00", expected_weekday: Thursday}

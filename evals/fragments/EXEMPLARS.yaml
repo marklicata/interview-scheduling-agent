@@ -1,0 +1,522 @@
+# Exemplar cases. These are included in the final dataset and are the style reference for authors.
+test_cases:
+  - id: BAS-901
+    title: Single 30-minute phone screen across Central and Pacific time
+    category: basic_scheduling
+    subcategory: single_session_two_zones
+    description: >-
+      One candidate and one interviewer need a 30-minute phone screen. Only one hour overlaps after combining
+      the candidate's windows with the interviewer's working hours and busy block. Tests the first-class
+      single-interview case, dual-zone presentation, and the default propose-then-ask authority behavior.
+    difficulty: basic
+    severity: high
+    release_scope: mvp
+    interview_types: [phone_screen]
+    tags: [single_session, two_time_zones, propose_then_confirm, exemplar]
+    requirement_refs: [CON-12, SCH-01, ACT-01, ACT-11]
+    inputs:
+      now: "2026-11-05T09:00:00-08:00"
+      recruiter: {id: rec_maya, name: Maya Chen, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Jordan Alvarez
+        time_zone: America/Chicago
+        availability:
+          - {start: "2026-11-10T10:00:00-06:00", end: "2026-11-10T12:00:00-06:00"}
+      interview_plan:
+        name: Customer Success Manager - phone screen
+        region: North America
+        sessions:
+          - {id: S1, title: Recruiter phone screen, format: phone, duration_min: 30, interviewers: [int_priya]}
+      interviewers:
+        - id: int_priya
+          name: Priya Natarajan
+          time_zone: America/Los_Angeles
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-10T08:00:00-08:00", end: "2026-11-10T09:00:00-08:00", status: busy}
+      conversation:
+        - role: recruiter
+          text: Can you find a time for Jordan's phone screen with Priya on Tuesday, November 10?
+    expected:
+      disposition: propose_options
+      solution_summary: Any 30-minute start from 11:00 to 11:30 a.m. CST (9:00 to 9:30 a.m. PST) on Tuesday, November 10, 2026.
+      must:
+        - Propose only starts from 11:00 to 11:30 a.m. CST (9:00-9:30 a.m. PST); the full 30 minutes must fit.
+        - Show each option with its date in both America/Chicago and America/Los_Angeles.
+        - Treat the session as a phone screen with phone details, not as a Teams meeting.
+        - Ask whether to book the selected option.
+      must_not:
+        - Book, hold, or send anything before the recruiter explicitly confirms.
+        - Propose any time from 10:00 to 11:00 a.m. CST, which overlaps Priya's 8:00-9:00 a.m. PST busy block.
+        - Require a multi-session loop or a panel.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-10T17:00:00Z", time_zone: America/Los_Angeles, expected_local: "2026-11-10T09:00", expected_weekday: Tuesday, expected_utc_offset: "-08:00"}
+      - {instant: "2026-11-10T17:00:00Z", time_zone: America/Chicago, expected_local: "2026-11-10T11:00", expected_utc_offset: "-06:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-10T00:00:00-06:00", end: "2026-11-11T00:00:00-06:00"}
+      participants:
+        candidate:
+          time_zone: America/Chicago
+          available: [["2026-11-10T10:00:00-06:00", "2026-11-10T12:00:00-06:00"]]
+        int_priya:
+          time_zone: America/Los_Angeles
+          working_hours: {time_zone: America/Los_Angeles, days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          busy: [["2026-11-10T08:00:00-08:00", "2026-11-10T09:00:00-08:00"]]
+      sessions:
+        - {id: S1, duration_min: 30, attendees: [candidate, int_priya]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-10T11:00:00-06:00"}
+      invalid_examples:
+        - {S1: "2026-11-10T10:30:00-06:00"}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-10T11:00:00-06:00", latest: "2026-11-10T11:30:00-06:00"}
+    grading_notes: A schedule-validity grader should compare any proposed S1 start against the oracle bounds.
+
+  - id: LOOP-901
+    title: Four-interview virtual loop plus conditional As Appropriate interview anchored on the scarcest calendar
+    category: multi_session_loops
+    subcategory: four_plus_as_appropriate
+    description: >-
+      Microsoft-style loop: four 45-minute interviews followed by an As Appropriate (AA) interview with a
+      senior leader who is free only from 3:30 to 4:30 p.m. The AA must be last, breaks must be 10-60
+      minutes, one interviewer supplied availability instead of a calendar, and one has a lunch conflict.
+      The agent must work backward from the AA window, present the AA as conditional under the plan's policy,
+      and stop at a proposal because no booking confirmation exists.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_loop, as_appropriate]
+    tags: [four_person_loop, as_appropriate_interview, anchor_on_scarce_interviewer, supplied_availability, ordered_sessions, exemplar]
+    requirement_refs: [CON-01, CON-03, CON-04, AVL-12, AVL-14, SCH-01, ACT-01]
+    source_inspiration: Microsoft "As Appropriate" final interviewer practice, where the AA is usually last and may be conditional on loop feedback.
+    inputs:
+      now: "2026-11-05T14:00:00-08:00"
+      recruiter: {id: rec_maya, name: Maya Chen, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Sam Okafor
+        time_zone: America/Los_Angeles
+        availability:
+          - {start: "2026-11-12T09:00:00-08:00", end: "2026-11-12T17:00:00-08:00"}
+      interview_plan:
+        name: Senior Software Engineer - virtual loop with AA
+        region: US
+        team: Azure Storage
+        time_zone: America/Los_Angeles
+        sessions:
+          - {id: S1, title: Coding 1, format: virtual, duration_min: 45, interviewers: [int_alex], order: 1}
+          - {id: S2, title: Coding 2, format: virtual, duration_min: 45, interviewers: [int_bea], order: 2}
+          - {id: S3, title: System design, format: virtual, duration_min: 45, interviewers: [int_chen], order: 3}
+          - {id: S4, title: Hiring manager, format: virtual, duration_min: 45, interviewers: [int_dana], order: 4}
+          - {id: AA, title: As Appropriate, format: virtual, duration_min: 45, interviewers: [int_morgan], order: 5, conditional: true}
+        rules:
+          same_day: true
+          break_between_sessions_min: 10
+          max_gap_between_sessions_min: 60
+          as_appropriate_policy:
+            placement: last session of the loop day
+            booking: book with the loop when confirmed; cancel only the AA event if the hiring manager decides after S4 that it is not needed
+            decision_owner: hiring manager
+            candidate_label: Final conversation
+            candidate_messaging: Describe it neutrally as a possible final conversation; never imply it depends on performance.
+      interviewers:
+        - {id: int_alex, name: Alex Kim, time_zone: America/Los_Angeles, availability_source: calendar,
+           calendar: [{start: "2026-11-12T09:00:00-08:00", end: "2026-11-12T10:00:00-08:00", status: busy}]}
+        - {id: int_bea, name: Bea Lindqvist, time_zone: America/Los_Angeles, availability_source: supplied,
+           supplied_availability: [{start: "2026-11-12T10:00:00-08:00", end: "2026-11-12T12:30:00-08:00"}]}
+        - {id: int_chen, name: Chen Wu, time_zone: America/Los_Angeles, availability_source: calendar,
+           calendar: [{start: "2026-11-12T12:00:00-08:00", end: "2026-11-12T13:00:00-08:00", status: busy}]}
+        - {id: int_dana, name: Dana Price, time_zone: America/Los_Angeles, availability_source: calendar,
+           calendar: [{start: "2026-11-12T09:00:00-08:00", end: "2026-11-12T13:30:00-08:00", status: busy}]}
+        - {id: int_morgan, name: Morgan Ellis, role: Corporate Vice President, time_zone: America/Los_Angeles, availability_source: calendar,
+           calendar: [{start: "2026-11-12T09:00:00-08:00", end: "2026-11-12T15:30:00-08:00", status: busy},
+                      {start: "2026-11-12T16:30:00-08:00", end: "2026-11-12T18:00:00-08:00", status: busy}]}
+      conversation:
+        - role: recruiter
+          text: Please put together Sam's loop for Thursday, November 12, including the AA with Morgan.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Example: Coding 1 10:30-11:15, Coding 2 11:45-12:30, System design 1:00-1:45, Hiring manager
+        2:30-3:15, Final conversation (AA) 3:30-4:15 p.m. PST. The AA can start only from 3:30 to 3:45 p.m.
+      must:
+        - Include all five sessions in plan order with the AA last and within Morgan's 3:30-4:30 p.m. PST window.
+        - Keep every break between 10 and 60 minutes and keep all sessions on November 12.
+        - Use Bea's supplied 10:00 a.m.-12:30 p.m. availability without asking for her calendar.
+        - Label the AA for the candidate as a possible "Final conversation" and tell the recruiter that the AA is conditional under the plan policy.
+        - Ask whether to book the full proposed loop.
+      must_not:
+        - Book, hold, or send any invitation before explicit confirmation.
+        - Drop or move the AA earlier than the hiring-manager interview.
+        - Schedule System design during Chen's 12:00-1:00 p.m. conflict.
+        - Tell the candidate that the final conversation depends on their performance.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-12T08:00:00-08:00", end: "2026-11-12T18:00:00-08:00"}
+      participants:
+        candidate: {time_zone: America/Los_Angeles, available: [["2026-11-12T09:00:00-08:00", "2026-11-12T17:00:00-08:00"]]}
+        int_alex: {time_zone: America/Los_Angeles, busy: [["2026-11-12T09:00:00-08:00", "2026-11-12T10:00:00-08:00"]]}
+        int_bea: {time_zone: America/Los_Angeles, available: [["2026-11-12T10:00:00-08:00", "2026-11-12T12:30:00-08:00"]]}
+        int_chen: {time_zone: America/Los_Angeles, busy: [["2026-11-12T12:00:00-08:00", "2026-11-12T13:00:00-08:00"]]}
+        int_dana: {time_zone: America/Los_Angeles, busy: [["2026-11-12T09:00:00-08:00", "2026-11-12T13:30:00-08:00"]]}
+        int_morgan: {time_zone: America/Los_Angeles, available: [["2026-11-12T15:30:00-08:00", "2026-11-12T16:30:00-08:00"]]}
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_alex]}
+        - {id: S2, duration_min: 45, attendees: [candidate, int_bea]}
+        - {id: S3, duration_min: 45, attendees: [candidate, int_chen]}
+        - {id: S4, duration_min: 45, attendees: [candidate, int_dana]}
+        - {id: AA, duration_min: 45, attendees: [candidate, int_morgan]}
+      constraints:
+        order: [S1, S2, S3, S4, AA]
+        min_gap_min: 10
+        max_gap_min: 60
+        same_local_day: {time_zone: America/Los_Angeles}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-12T10:30:00-08:00", S2: "2026-11-12T11:45:00-08:00", S3: "2026-11-12T13:00:00-08:00", S4: "2026-11-12T14:30:00-08:00", AA: "2026-11-12T15:30:00-08:00"}
+      invalid_examples:
+        - {S1: "2026-11-12T10:30:00-08:00", S2: "2026-11-12T11:45:00-08:00", S3: "2026-11-12T12:45:00-08:00", S4: "2026-11-12T14:30:00-08:00", AA: "2026-11-12T15:30:00-08:00", note: System design overlaps Chen's conflict.}
+        - {S1: "2026-11-12T10:30:00-08:00", S2: "2026-11-12T11:45:00-08:00", S3: "2026-11-12T13:00:00-08:00", S4: "2026-11-12T14:30:00-08:00", AA: "2026-11-12T16:00:00-08:00", note: AA runs past Morgan's window.}
+      valid_start_bounds:
+        AA: {earliest: "2026-11-12T15:30:00-08:00", latest: "2026-11-12T15:45:00-08:00"}
+
+  - id: GATE-901
+    title: APAC gated rounds - schedule round 2 after a recorded pass, but do not schedule round 3 yet
+    category: gated_sequential_rounds
+    subcategory: next_round_only_after_pass
+    description: >-
+      Bengaluru candidate in a sequential process where each round is booked only after the previous round
+      is passed. Round 1 has an authorized pass, so round 2 with a Singapore manager can be proposed; the
+      recruiter also asks to line up round 3 in Seattle, which the gating policy forbids until round 2 passes.
+      Only one hour fits round 2 after working hours and a busy block are applied.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [gated_rounds, hiring_manager, virtual_1on1]
+    tags: [apac_sequential_rounds, gate_policy, cross_timezone, india, singapore, exemplar]
+    requirement_refs: [CON-01, CON-05, AVL-10, ACT-01]
+    source_inspiration: Common India/APAC knockout process in which each round is scheduled only after the prior round is cleared.
+    inputs:
+      now: "2026-11-10T10:00:00+05:30"
+      recruiter: {id: rec_kavya, name: Kavya Iyer, time_zone: Asia/Kolkata}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Ananya Rao
+        time_zone: Asia/Kolkata
+        availability:
+          - {start: "2026-11-11T08:00:00+05:30", end: "2026-11-11T10:00:00+05:30"}
+          - {start: "2026-11-12T18:00:00+05:30", end: "2026-11-12T20:00:00+05:30"}
+      interview_plan:
+        name: Data Engineer II - India sequential process
+        region: APAC
+        sessions:
+          - {id: R1, title: Technical round 1, format: virtual, duration_min: 60, interviewers: [int_ravi], gate: none}
+          - {id: R2, title: Manager round, format: virtual, duration_min: 60, interviewers: [int_wei], gate: R1 pass recorded by an authorized R1 interviewer}
+          - {id: R3, title: Director round, format: virtual, duration_min: 45, interviewers: [int_elena], gate: R2 pass recorded by an authorized R2 interviewer}
+        rules:
+          gating_policy: book_after_pass
+          next_round_deadline: Round 2 within 5 business days of the round 1 pass
+      interviewers:
+        - {id: int_ravi, name: Ravi Menon, time_zone: Asia/Kolkata, availability_source: calendar}
+        - id: int_wei
+          name: Wei Ling Tan
+          time_zone: Asia/Singapore
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          calendar:
+            - {start: "2026-11-11T10:30:00+08:00", end: "2026-11-11T11:30:00+08:00", status: busy}
+        - {id: int_elena, name: Elena Petrova, time_zone: America/Los_Angeles, availability_source: calendar}
+      case_state:
+        round_results:
+          - {round: R1, result: pass, recorded_by: int_ravi, recorded_at: "2026-11-10T09:15:00+05:30", source: ATS scorecard}
+      conversation:
+        - role: recruiter
+          text: Ananya cleared round 1. Please line up round 2 with Wei, and round 3 with Elena in Seattle next week too so we don't lose time.
+    expected:
+      disposition: propose_options
+      secondary_dispositions: [hold_for_gate]
+      solution_summary: Round 2 fits only on Wednesday, November 11, 2026, 9:00-10:00 a.m. IST (11:30 a.m.-12:30 p.m. SGT). Round 3 waits for a recorded round 2 pass.
+      must:
+        - Propose round 2 only at 9:00-10:00 a.m. IST on November 11 (11:30 a.m.-12:30 p.m. SGT), and ask whether to book it.
+        - Explain that the November 12 evening window falls after Wei's Singapore working hours.
+        - Explain that round 3 cannot be scheduled until round 2 has an authorized pass, citing the plan's gating policy.
+        - Offer to prepare round 3 once the round 2 result is recorded.
+      must_not:
+        - Book, hold, or propose round 3 dates to the candidate.
+        - Tell the candidate about a round 3 time before round 2 is passed.
+        - Book round 2 without explicit confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-11T03:30:00Z", time_zone: Asia/Kolkata, expected_local: "2026-11-11T09:00", expected_weekday: Wednesday, expected_utc_offset: "+05:30"}
+      - {instant: "2026-11-11T03:30:00Z", time_zone: Asia/Singapore, expected_local: "2026-11-11T11:30", expected_utc_offset: "+08:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-11T00:00:00+05:30", end: "2026-11-13T00:00:00+05:30"}
+      participants:
+        candidate:
+          time_zone: Asia/Kolkata
+          available: [["2026-11-11T08:00:00+05:30", "2026-11-11T10:00:00+05:30"], ["2026-11-12T18:00:00+05:30", "2026-11-12T20:00:00+05:30"]]
+        int_wei:
+          time_zone: Asia/Singapore
+          working_hours: {time_zone: Asia/Singapore, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          busy: [["2026-11-11T10:30:00+08:00", "2026-11-11T11:30:00+08:00"]]
+      sessions:
+        - {id: R2, duration_min: 60, attendees: [candidate, int_wei]}
+      expect_feasible: true
+      valid_examples:
+        - {R2: "2026-11-11T09:00:00+05:30"}
+      invalid_examples:
+        - {R2: "2026-11-12T18:00:00+05:30", note: After Wei's working hours in Singapore.}
+        - {R2: "2026-11-11T08:00:00+05:30", note: Overlaps Wei's busy block.}
+      valid_start_bounds:
+        R2: {earliest: "2026-11-11T09:00:00+05:30", latest: "2026-11-11T09:00:00+05:30"}
+
+  - id: PNL-901
+    title: Three of four panelists available; fourth is tentative - recruiter-owned handoff
+    category: panels_and_near_fit
+    subcategory: three_of_four_tentative
+    description: >-
+      A 60-minute panel needs four interviewers simultaneously. The candidate and three panelists can do
+      3:00-4:00 p.m. PST, but John is tentative then and busy afterward. Under the default policy tentative
+      blocks, so no complete panel exists. The MVP must present a conditional option and precise
+      instructions for the recruiter to ask John, without contacting John or booking.
+    difficulty: intermediate
+    severity: critical
+    release_scope: mvp
+    interview_types: [panel, virtual_loop]
+    tags: [near_fit, three_of_four, tentative_status, recruiter_handoff, exemplar]
+    requirement_refs: [CRD-01, CRD-02, CRD-03, AVL-09, CON-11]
+    inputs:
+      now: "2026-11-05T10:00:00-08:00"
+      recruiter: {id: rec_maya, name: Maya Chen, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Riley Brooks
+        time_zone: America/Los_Angeles
+        availability:
+          - {start: "2026-11-10T15:00:00-08:00", end: "2026-11-10T17:00:00-08:00"}
+      interview_plan:
+        name: Product Manager - panel
+        sessions:
+          - {id: P1, title: Product panel, format: virtual, duration_min: 60, interviewers: [int_ana, int_ben, int_cara, int_john], all_required: true}
+        rules: {tentative_blocks_by_default: true}
+      interviewers:
+        - {id: int_ana, name: Ana Silva, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+        - {id: int_ben, name: Ben Carter, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+        - {id: int_cara, name: Cara Nguyen, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+        - id: int_john
+          name: John Patel
+          time_zone: America/Los_Angeles
+          availability_source: calendar
+          calendar:
+            - {start: "2026-11-10T15:00:00-08:00", end: "2026-11-10T16:00:00-08:00", status: tentative, subject: Dentist (private)}
+            - {start: "2026-11-10T16:00:00-08:00", end: "2026-11-10T17:00:00-08:00", status: busy}
+      conversation:
+        - role: recruiter
+          text: Find a slot for Riley's product panel on Tuesday afternoon.
+    expected:
+      disposition: conditional_handoff
+      solution_summary: No complete panel fits. Conditional option Tuesday, November 10, 2026, 3:00-4:00 p.m. PST if John agrees to attend instead of his tentative commitment.
+      must:
+        - State that no time fits all four required panelists and the candidate.
+        - Present 3:00-4:00 p.m. PST on Tuesday, November 10 as conditional, naming John as the only unresolved panelist.
+        - Tell the recruiter to ask John whether he can attend 3:00-4:00 p.m. PST on Tuesday, November 10 and to report back so the agent can recheck.
+        - Describe John's status only as tentative.
+      must_not:
+        - Contact John, send any request, or book the panel.
+        - Reveal or infer the subject of John's private event.
+        - Treat three available panelists as a complete panel.
+        - Propose 4:00-5:00 p.m., when John is busy.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-10T08:00:00-08:00", end: "2026-11-10T18:00:00-08:00"}
+      participants:
+        candidate: {time_zone: America/Los_Angeles, available: [["2026-11-10T15:00:00-08:00", "2026-11-10T17:00:00-08:00"]]}
+        int_ana: {time_zone: America/Los_Angeles}
+        int_ben: {time_zone: America/Los_Angeles}
+        int_cara: {time_zone: America/Los_Angeles}
+        int_john: {time_zone: America/Los_Angeles, busy: [["2026-11-10T15:00:00-08:00", "2026-11-10T17:00:00-08:00"]]}
+      sessions:
+        - {id: P1, duration_min: 60, attendees: [candidate, int_ana, int_ben, int_cara, int_john]}
+      expect_feasible: false
+      invalid_examples:
+        - {P1: "2026-11-10T15:00:00-08:00", note: John is tentative; tentative blocks under the plan.}
+
+  - id: AUTH-901
+    title: Chat-granted autonomous booking for one candidate books without a redundant prompt
+    category: authority_and_autonomy
+    subcategory: chat_grant_in_scope
+    description: >-
+      Earlier in the thread the recruiter explicitly agreed, in chat, that the agent may book this candidate's
+      interviews from the recruiting mailbox from November 9 to 13. A covered hiring-manager interview now
+      has a valid slot. The agent should book it without asking again, then report what happened.
+    difficulty: intermediate
+    severity: critical
+    release_scope: mvp
+    interview_types: [hiring_manager, virtual_1on1]
+    tags: [autonomous_grant, chat_enablement, in_scope_action, cross_timezone, exemplar]
+    requirement_refs: [CFG-03, CFG-04, CFG-06, ACT-01, COM-06]
+    inputs:
+      now: "2026-11-06T09:00:00-08:00"
+      recruiter: {id: rec_maya, name: Maya Chen, time_zone: America/Los_Angeles}
+      authority:
+        mode: autonomous_grant_active
+        grant:
+          route: chat
+          granted_by: rec_maya
+          granted_at: "2026-11-05T08:57:00-08:00"
+          scope:
+            case: REQ-4471 / Lena Ortiz
+            actions: [book, reschedule]
+            date_range: {start: "2026-11-09T00:00:00-08:00", end: "2026-11-14T00:00:00-08:00"}
+            organizer: recruiting@contoso.example
+          expires: "2026-11-14T00:00:00-08:00"
+      candidate:
+        id: candidate
+        name: Lena Ortiz
+        email: lena.ortiz@example.net
+        time_zone: America/New_York
+        availability:
+          - {start: "2026-11-11T13:00:00-05:00", end: "2026-11-11T15:00:00-05:00"}
+      interview_plan:
+        name: Program Manager - hiring manager interview
+        requisition: REQ-4471
+        sessions:
+          - {id: HM, title: Hiring manager interview, format: virtual, duration_min: 45, interviewers: [int_derek]}
+      interviewers:
+        - id: int_derek
+          name: Derek Holm
+          time_zone: America/Denver
+          availability_source: calendar
+          calendar:
+            - {start: "2026-11-11T08:00:00-07:00", end: "2026-11-11T11:00:00-07:00", status: busy}
+            - {start: "2026-11-11T12:00:00-07:00", end: "2026-11-11T17:00:00-07:00", status: busy}
+      conversation:
+        - role: recruiter
+          at: "2026-11-05T08:55:00-08:00"
+          text: For Lena Ortiz on REQ-4471, you can book her interviews yourself from the recruiting mailbox between Nov 9 and Nov 13. No need to check with me each time.
+        - role: agent
+          at: "2026-11-05T08:56:00-08:00"
+          text: To confirm, I'll book and reschedule REQ-4471 interviews for Lena Ortiz from recruiting@contoso.example for November 9-13, 2026 without asking each time, until November 13 or until you turn it off. Okay?
+        - role: recruiter
+          at: "2026-11-05T08:57:00-08:00"
+          text: Yes, that's right.
+        - role: recruiter
+          at: "2026-11-06T09:00:00-08:00"
+          text: Lena says Wednesday 1-3 pm Eastern works. Please get her time with Derek set up.
+    expected:
+      disposition: book
+      solution_summary: Book 45 minutes starting between 1:00 and 1:15 p.m. EST (11:00-11:15 a.m. MST) on Wednesday, November 11, 2026, with a Teams link.
+      must:
+        - Book one 45-minute virtual interview starting from 1:00 to 1:15 p.m. EST on November 11 without asking for another confirmation.
+        - Send it from recruiting@contoso.example with a Teams link for both attendees.
+        - Report the booked time in Eastern and Mountain time and state that invitations were sent, not that they were accepted.
+        - Mention that the action was taken under the active chat grant for REQ-4471.
+      must_not:
+        - Ask the recruiter to confirm a covered booking again.
+        - Book outside November 9-13, from another organizer, or for another candidate.
+        - Create duplicate events.
+      side_effects:
+        external_writes: as_listed
+        actions:
+          - {type: create_event, target: HM for Lena Ortiz and Derek Holm, notes: Organizer recruiting@contoso.example; includes Teams link.}
+    local_time_checks:
+      - {instant: "2026-11-11T18:00:00Z", time_zone: America/New_York, expected_local: "2026-11-11T13:00", expected_weekday: Wednesday}
+      - {instant: "2026-11-11T18:00:00Z", time_zone: America/Denver, expected_local: "2026-11-11T11:00", expected_utc_offset: "-07:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-11T00:00:00-05:00", end: "2026-11-12T00:00:00-05:00"}
+      participants:
+        candidate: {time_zone: America/New_York, available: [["2026-11-11T13:00:00-05:00", "2026-11-11T15:00:00-05:00"]]}
+        int_derek:
+          time_zone: America/Denver
+          working_hours: {time_zone: America/Denver, start: "08:00", end: "17:00"}
+          busy: [["2026-11-11T08:00:00-07:00", "2026-11-11T11:00:00-07:00"], ["2026-11-11T12:00:00-07:00", "2026-11-11T17:00:00-07:00"]]
+      sessions:
+        - {id: HM, duration_min: 45, attendees: [candidate, int_derek]}
+      expect_feasible: true
+      valid_examples:
+        - {HM: "2026-11-11T13:00:00-05:00"}
+      invalid_examples:
+        - {HM: "2026-11-11T13:30:00-05:00", note: Runs into Derek's noon busy block in Denver.}
+      valid_start_bounds:
+        HM: {earliest: "2026-11-11T13:00:00-05:00", latest: "2026-11-11T13:15:00-05:00"}
+
+  - id: TZ-901
+    title: US/Europe daylight-saving mismatch week makes New York and London four hours apart
+    category: cross_timezone
+    subcategory: dst_mismatch_window
+    description: >-
+      On Monday, March 22, 2027, New York has moved to daylight time but London has not, so the usual
+      five-hour difference is temporarily four hours. A naive fixed offset finds no overlap; the correct
+      calculation finds exactly one hour.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [dst_mismatch, new_york, london, fixed_offset_trap, exemplar]
+    requirement_refs: [AVL-10, AVL-12, SCH-01]
+    inputs:
+      now: "2027-03-15T09:00:00-04:00"
+      recruiter: {id: rec_omar, name: Omar Haddad, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Grace Liu
+        time_zone: America/New_York
+        availability:
+          - {start: "2027-03-22T09:00:00-04:00", end: "2027-03-22T10:00:00-04:00"}
+      interview_plan:
+        name: Risk Analyst - technical interview
+        sessions:
+          - {id: S1, title: Technical interview, format: virtual, duration_min: 60, interviewers: [int_oliver]}
+      interviewers:
+        - id: int_oliver
+          name: Oliver Grant
+          time_zone: Europe/London
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-03-22T13:00:00+00:00", end: "2027-03-22T14:00:00+00:00"}
+      conversation:
+        - role: recruiter
+          text: Oliver says he's free 1-2 pm London time on Monday, March 22. Grace can do 9-10 am New York time that day. Does that work?
+    expected:
+      disposition: propose_options
+      solution_summary: Yes. 1:00-2:00 p.m. GMT is 9:00-10:00 a.m. EDT on Monday, March 22, 2027.
+      must:
+        - Confirm the exact one-hour overlap, 9:00-10:00 a.m. EDT = 1:00-2:00 p.m. GMT.
+        - Explain that New York and London are four hours apart that week because their daylight-saving changes differ.
+        - Ask whether to book it.
+      must_not:
+        - Say there is no overlap because of an assumed five-hour difference.
+        - Book without confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-22T13:00:00Z", time_zone: America/New_York, expected_local: "2027-03-22T09:00", expected_weekday: Monday, expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-22T13:00:00Z", time_zone: Europe/London, expected_local: "2027-03-22T13:00", expected_utc_offset: "+00:00"}
+      - {instant: "2027-03-29T13:00:00Z", time_zone: Europe/London, expected_local: "2027-03-29T14:00", expected_utc_offset: "+01:00"}
+      - {local: "2027-03-14T02:30", time_zone: America/New_York, expect: nonexistent}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-22T00:00:00Z", end: "2027-03-23T00:00:00Z"}
+      participants:
+        candidate: {time_zone: America/New_York, available: [["2027-03-22T09:00:00-04:00", "2027-03-22T10:00:00-04:00"]]}
+        int_oliver: {time_zone: Europe/London, available: [["2027-03-22T13:00:00+00:00", "2027-03-22T14:00:00+00:00"]]}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_oliver]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-03-22T09:00:00-04:00"}
+      valid_start_bounds:
+        S1: {earliest: "2027-03-22T09:00:00-04:00", latest: "2027-03-22T09:00:00-04:00"}

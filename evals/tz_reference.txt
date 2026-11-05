@@ -1,0 +1,49 @@
+- America/Los_Angeles: offset on 2026-11-10 -08:00; transitions: 2026-11-01 09:00Z (Sun): -07:00 -> -08:00; local clock jumps 01:59+1m -> 01:00 | 2027-03-14 10:00Z (Sun): -08:00 -> -07:00; local clock jumps 01:59+1m -> 03:00 | 2027-11-07 09:00Z (Sun): -07:00 -> -08:00; local clock jumps 01:59+1m -> 01:00
+- America/Denver: offset on 2026-11-10 -07:00; transitions: 2026-11-01 08:00Z (Sun): -06:00 -> -07:00; local clock jumps 01:59+1m -> 01:00 | 2027-03-14 09:00Z (Sun): -07:00 -> -06:00; local clock jumps 01:59+1m -> 03:00 | 2027-11-07 08:00Z (Sun): -06:00 -> -07:00; local clock jumps 01:59+1m -> 01:00
+- America/Phoenix: offset on 2026-11-10 -07:00; no transitions Oct 2026-Nov 2027
+- America/Chicago: offset on 2026-11-10 -06:00; transitions: 2026-11-01 07:00Z (Sun): -05:00 -> -06:00; local clock jumps 01:59+1m -> 01:00 | 2027-03-14 08:00Z (Sun): -06:00 -> -05:00; local clock jumps 01:59+1m -> 03:00 | 2027-11-07 07:00Z (Sun): -05:00 -> -06:00; local clock jumps 01:59+1m -> 01:00
+- America/New_York: offset on 2026-11-10 -05:00; transitions: 2026-11-01 06:00Z (Sun): -04:00 -> -05:00; local clock jumps 01:59+1m -> 01:00 | 2027-03-14 07:00Z (Sun): -05:00 -> -04:00; local clock jumps 01:59+1m -> 03:00 | 2027-11-07 06:00Z (Sun): -04:00 -> -05:00; local clock jumps 01:59+1m -> 01:00
+- America/St_Johns: offset on 2026-11-10 -03:30; transitions: 2026-11-01 04:30Z (Sun): -02:30 -> -03:30; local clock jumps 01:59+1m -> 01:00 | 2027-03-14 05:30Z (Sun): -03:30 -> -02:30; local clock jumps 01:59+1m -> 03:00 | 2027-11-07 04:30Z (Sun): -02:30 -> -03:30; local clock jumps 01:59+1m -> 01:00
+- America/Halifax: offset on 2026-11-10 -04:00; transitions: 2026-11-01 05:00Z (Sun): -03:00 -> -04:00; local clock jumps 01:59+1m -> 01:00 | 2027-03-14 06:00Z (Sun): -04:00 -> -03:00; local clock jumps 01:59+1m -> 03:00 | 2027-11-07 05:00Z (Sun): -03:00 -> -04:00; local clock jumps 01:59+1m -> 01:00
+- America/Mexico_City: offset on 2026-11-10 -06:00; no transitions Oct 2026-Nov 2027
+- America/Sao_Paulo: offset on 2026-11-10 -03:00; no transitions Oct 2026-Nov 2027
+- America/Santiago: offset on 2026-11-10 -03:00; transitions: 2027-04-04 03:00Z (Sat): -03:00 -> -04:00; local clock jumps 23:59+1m -> 23:00 | 2027-09-05 04:00Z (Sun): -04:00 -> -03:00; local clock jumps 23:59+1m -> 01:00
+- America/Bogota: offset on 2026-11-10 -05:00; no transitions Oct 2026-Nov 2027
+- Europe/London: offset on 2026-11-10 +00:00; transitions: 2026-10-25 01:00Z (Sun): +01:00 -> +00:00; local clock jumps 01:59+1m -> 01:00 | 2027-03-28 01:00Z (Sun): +00:00 -> +01:00; local clock jumps 00:59+1m -> 02:00 | 2027-10-31 01:00Z (Sun): +01:00 -> +00:00; local clock jumps 01:59+1m -> 01:00
+- Europe/Dublin: offset on 2026-11-10 +00:00; transitions: 2026-10-25 01:00Z (Sun): +01:00 -> +00:00; local clock jumps 01:59+1m -> 01:00 | 2027-03-28 01:00Z (Sun): +00:00 -> +01:00; local clock jumps 00:59+1m -> 02:00 | 2027-10-31 01:00Z (Sun): +01:00 -> +00:00; local clock jumps 01:59+1m -> 01:00
+- Europe/Lisbon: offset on 2026-11-10 +00:00; transitions: 2026-10-25 01:00Z (Sun): +01:00 -> +00:00; local clock jumps 01:59+1m -> 01:00 | 2027-03-28 01:00Z (Sun): +00:00 -> +01:00; local clock jumps 00:59+1m -> 02:00 | 2027-10-31 01:00Z (Sun): +01:00 -> +00:00; local clock jumps 01:59+1m -> 01:00
+- Europe/Berlin: offset on 2026-11-10 +01:00; transitions: 2026-10-25 01:00Z (Sun): +02:00 -> +01:00; local clock jumps 02:59+1m -> 02:00 | 2027-03-28 01:00Z (Sun): +01:00 -> +02:00; local clock jumps 01:59+1m -> 03:00 | 2027-10-31 01:00Z (Sun): +02:00 -> +01:00; local clock jumps 02:59+1m -> 02:00
+- Europe/Paris: offset on 2026-11-10 +01:00; transitions: 2026-10-25 01:00Z (Sun): +02:00 -> +01:00; local clock jumps 02:59+1m -> 02:00 | 2027-03-28 01:00Z (Sun): +01:00 -> +02:00; local clock jumps 01:59+1m -> 03:00 | 2027-10-31 01:00Z (Sun): +02:00 -> +01:00; local clock jumps 02:59+1m -> 02:00
+- Europe/Warsaw: offset on 2026-11-10 +01:00; transitions: 2026-10-25 01:00Z (Sun): +02:00 -> +01:00; local clock jumps 02:59+1m -> 02:00 | 2027-03-28 01:00Z (Sun): +01:00 -> +02:00; local clock jumps 01:59+1m -> 03:00 | 2027-10-31 01:00Z (Sun): +02:00 -> +01:00; local clock jumps 02:59+1m -> 02:00
+- Europe/Istanbul: offset on 2026-11-10 +03:00; no transitions Oct 2026-Nov 2027
+- Africa/Cairo: offset on 2026-11-10 +02:00; transitions: 2026-10-29 21:00Z (Thu): +03:00 -> +02:00; local clock jumps 23:59+1m -> 23:00 | 2027-04-29 22:00Z (Fri): +02:00 -> +03:00; local clock jumps 23:59+1m -> 01:00 | 2027-10-28 21:00Z (Thu): +03:00 -> +02:00; local clock jumps 23:59+1m -> 23:00
+- Africa/Lagos: offset on 2026-11-10 +01:00; no transitions Oct 2026-Nov 2027
+- Africa/Nairobi: offset on 2026-11-10 +03:00; no transitions Oct 2026-Nov 2027
+- Africa/Johannesburg: offset on 2026-11-10 +02:00; no transitions Oct 2026-Nov 2027
+- Asia/Jerusalem: offset on 2026-11-10 +02:00; transitions: 2026-10-24 23:00Z (Sun): +03:00 -> +02:00; local clock jumps 01:59+1m -> 01:00 | 2027-03-26 00:00Z (Fri): +02:00 -> +03:00; local clock jumps 01:59+1m -> 03:00 | 2027-10-30 23:00Z (Sun): +03:00 -> +02:00; local clock jumps 01:59+1m -> 01:00
+- Asia/Dubai: offset on 2026-11-10 +04:00; no transitions Oct 2026-Nov 2027
+- Asia/Riyadh: offset on 2026-11-10 +03:00; no transitions Oct 2026-Nov 2027
+- Asia/Tehran: offset on 2026-11-10 +03:30; no transitions Oct 2026-Nov 2027
+- Asia/Karachi: offset on 2026-11-10 +05:00; no transitions Oct 2026-Nov 2027
+- Asia/Kolkata: offset on 2026-11-10 +05:30; no transitions Oct 2026-Nov 2027
+- Asia/Kathmandu: offset on 2026-11-10 +05:45; no transitions Oct 2026-Nov 2027
+- Asia/Dhaka: offset on 2026-11-10 +06:00; no transitions Oct 2026-Nov 2027
+- Asia/Bangkok: offset on 2026-11-10 +07:00; no transitions Oct 2026-Nov 2027
+- Asia/Ho_Chi_Minh: offset on 2026-11-10 +07:00; no transitions Oct 2026-Nov 2027
+- Asia/Shanghai: offset on 2026-11-10 +08:00; no transitions Oct 2026-Nov 2027
+- Asia/Singapore: offset on 2026-11-10 +08:00; no transitions Oct 2026-Nov 2027
+- Asia/Manila: offset on 2026-11-10 +08:00; no transitions Oct 2026-Nov 2027
+- Asia/Seoul: offset on 2026-11-10 +09:00; no transitions Oct 2026-Nov 2027
+- Asia/Tokyo: offset on 2026-11-10 +09:00; no transitions Oct 2026-Nov 2027
+- Australia/Perth: offset on 2026-11-10 +08:00; no transitions Oct 2026-Nov 2027
+- Australia/Adelaide: offset on 2026-11-10 +10:30; transitions: 2026-10-03 16:30Z (Sun): +09:30 -> +10:30; local clock jumps 01:59+1m -> 03:00 | 2027-04-03 16:30Z (Sun): +10:30 -> +09:30; local clock jumps 02:59+1m -> 02:00 | 2027-10-02 16:30Z (Sun): +09:30 -> +10:30; local clock jumps 01:59+1m -> 03:00
+- Australia/Darwin: offset on 2026-11-10 +09:30; no transitions Oct 2026-Nov 2027
+- Australia/Brisbane: offset on 2026-11-10 +10:00; no transitions Oct 2026-Nov 2027
+- Australia/Sydney: offset on 2026-11-10 +11:00; transitions: 2026-10-03 16:00Z (Sun): +10:00 -> +11:00; local clock jumps 01:59+1m -> 03:00 | 2027-04-03 16:00Z (Sun): +11:00 -> +10:00; local clock jumps 02:59+1m -> 02:00 | 2027-10-02 16:00Z (Sun): +10:00 -> +11:00; local clock jumps 01:59+1m -> 03:00
+- Australia/Lord_Howe: offset on 2026-11-10 +11:00; transitions: 2026-10-03 15:30Z (Sun): +10:30 -> +11:00; local clock jumps 01:59+1m -> 02:30 | 2027-04-03 15:00Z (Sun): +11:00 -> +10:30; local clock jumps 01:59+1m -> 01:30 | 2027-10-02 15:30Z (Sun): +10:30 -> +11:00; local clock jumps 01:59+1m -> 02:30
+- Pacific/Auckland: offset on 2026-11-10 +13:00; transitions: 2027-04-03 14:00Z (Sun): +13:00 -> +12:00; local clock jumps 02:59+1m -> 02:00 | 2027-09-25 14:00Z (Sun): +12:00 -> +13:00; local clock jumps 01:59+1m -> 03:00
+- Pacific/Chatham: offset on 2026-11-10 +13:45; transitions: 2027-04-03 14:00Z (Sun): +13:45 -> +12:45; local clock jumps 03:44+1m -> 02:45 | 2027-09-25 14:00Z (Sun): +12:45 -> +13:45; local clock jumps 02:44+1m -> 03:45
+- Pacific/Apia: offset on 2026-11-10 +13:00; no transitions Oct 2026-Nov 2027
+- Pacific/Kiritimati: offset on 2026-11-10 +14:00; no transitions Oct 2026-Nov 2027
+- Pacific/Honolulu: offset on 2026-11-10 -10:00; no transitions Oct 2026-Nov 2027
+- America/Anchorage: offset on 2026-11-10 -09:00; transitions: 2026-11-01 10:00Z (Sun): -08:00 -> -09:00; local clock jumps 01:59+1m -> 01:00 | 2027-03-14 11:00Z (Sun): -09:00 -> -08:00; local clock jumps 01:59+1m -> 03:00 | 2027-11-07 10:00Z (Sun): -08:00 -> -09:00; local clock jumps 01:59+1m -> 01:00

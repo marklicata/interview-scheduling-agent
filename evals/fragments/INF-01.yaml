@@ -1,0 +1,1868 @@
+# Infeasible and limits cases (INF-001..INF-026): proven infeasibility, missing info vs inaccessible data,
+# contradictory constraints, policy limits, and concrete next steps.
+test_cases:
+  - id: INF-001
+    title: No overlap at all between a Lagos candidate and a Johannesburg interviewer
+    category: infeasible_and_limits
+    subcategory: no_overlap
+    description: >-
+      The candidate offers afternoons in Lagos (UTC+1); the interviewer supplied complete morning availability in
+      Johannesburg (UTC+2). After conversion the windows do not touch on either day. The agent must prove there is
+      no overlap, explain why with both zones, and give recruiter-owned next steps instead of inventing a slot.
+    difficulty: basic
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [no_overlap, supplied_availability, nigeria, south_africa, next_steps]
+    requirement_refs: [SCH-05, SCH-04, AVL-12, GS-003]
+    inputs:
+      now: "2026-11-12T09:00:00+01:00"
+      recruiter: {id: rec_chiamaka, name: Chiamaka Eze, time_zone: Africa/Lagos}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Tunde Bakare
+        time_zone: Africa/Lagos
+        availability:
+          - {start: "2026-11-17T14:00:00+01:00", end: "2026-11-17T16:00:00+01:00"}
+          - {start: "2026-11-18T14:00:00+01:00", end: "2026-11-18T16:00:00+01:00"}
+      interview_plan:
+        name: Fabrikam Regional Sales Lead - sales interview
+        sessions:
+          - {id: S1, title: Sales interview, format: virtual, duration_min: 45, interviewers: [int_lerato]}
+      interviewers:
+        - id: int_lerato
+          name: Lerato Mokoena
+          time_zone: Africa/Johannesburg
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2026-11-17T09:00:00+02:00", end: "2026-11-17T12:00:00+02:00"}
+            - {start: "2026-11-18T09:00:00+02:00", end: "2026-11-18T12:00:00+02:00"}
+          supplied_scope: Complete availability for November 17-18; she is unavailable at all other times those days.
+      conversation:
+        - role: recruiter
+          text: Tunde is free Tue/Wed 2-4pm Lagos time. Lerato sent 9-12 Joburg time both days. Can you match them?
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [request_availability]
+      solution_summary: >-
+        No overlap. Lerato's 9:00 a.m.-12:00 p.m. SAST equals 8:00-11:00 a.m. WAT, while Tunde is free 2:00-4:00 p.m.
+        WAT (3:00-5:00 p.m. SAST) on Tuesday, November 17 and Wednesday, November 18, 2026. Next steps - ask Tunde for
+        a morning window between 8:00 and 11:00 a.m. WAT, or have the recruiter ask Lerato for afternoon time.
+      must:
+        - State that no 45-minute slot exists on November 17 or 18 and show both windows in WAT and SAST.
+        - Explain the one-hour offset between Lagos and Johannesburg.
+        - Offer concrete next steps - ask Tunde for 8:00-11:00 a.m. WAT availability, or the recruiter asks Lerato for 3:00-5:00 p.m. SAST.
+      must_not:
+        - Propose or book any time, e.g. 2:00 p.m. WAT, that is outside Lerato's supplied windows.
+        - Treat Lerato's supplied hours as Lagos time.
+        - Contact Lerato or the candidate directly.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-17T13:00:00Z", time_zone: Africa/Lagos, expected_local: "2026-11-17T14:00", expected_weekday: Tuesday, expected_utc_offset: "+01:00"}
+      - {instant: "2026-11-17T13:00:00Z", time_zone: Africa/Johannesburg, expected_local: "2026-11-17T15:00", expected_utc_offset: "+02:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-17T00:00:00+01:00", end: "2026-11-19T00:00:00+01:00"}
+      participants:
+        candidate:
+          time_zone: Africa/Lagos
+          available: [["2026-11-17T14:00:00+01:00", "2026-11-17T16:00:00+01:00"], ["2026-11-18T14:00:00+01:00", "2026-11-18T16:00:00+01:00"]]
+        int_lerato:
+          time_zone: Africa/Johannesburg
+          available: [["2026-11-17T09:00:00+02:00", "2026-11-17T12:00:00+02:00"], ["2026-11-18T09:00:00+02:00", "2026-11-18T12:00:00+02:00"]]
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_lerato]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-11-17T14:00:00+01:00", note: Lerato's supplied window ended at 11:00 WAT.}
+        - {S1: "2026-11-17T10:00:00+01:00", note: Inside Lerato's window but outside Tunde's.}
+
+  - id: INF-002
+    title: Overlap of 40 minutes cannot hold a 45-minute interview
+    category: infeasible_and_limits
+    subcategory: overlap_shorter_than_duration
+    description: >-
+      A Chicago candidate is free from 3:20 p.m. CST and a New York interviewer works until 5:00 p.m. EST (4:00 p.m.
+      CST), leaving a 40-minute overlap for a 45-minute interview. Tempting wrong answers are to start at 3:20 and run
+      five minutes past working hours, or to shorten the interview silently.
+    difficulty: basic
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [overlap_too_short, working_hours, no_silent_shortening, two_time_zones]
+    requirement_refs: [SCH-05, SCH-01, INV-02]
+    inputs:
+      now: "2026-11-16T10:00:00-05:00"
+      recruiter: {id: rec_dmitri, name: Dmitri Volkov, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Keisha Reynolds
+        time_zone: America/Chicago
+        availability:
+          - {start: "2026-11-18T15:20:00-06:00", end: "2026-11-18T17:00:00-06:00"}
+      interview_plan:
+        name: Woodgrove Compliance Analyst - interview
+        sessions:
+          - {id: S1, title: Compliance interview, format: virtual, duration_min: 45, interviewers: [int_hector]}
+      interviewers:
+        - id: int_hector
+          name: Hector Morales
+          time_zone: America/New_York
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar: []
+      conversation:
+        - role: recruiter
+          text: Keisha can only do Wednesday from 3:20 her time (Chicago). Hector's afternoon is clear. Can we squeeze it in?
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [request_availability]
+      solution_summary: >-
+        Not on Wednesday, November 18, 2026 - the overlap is 3:20-4:00 p.m. CST (4:20-5:00 p.m. EST), only 40 minutes
+        for a 45-minute interview. Next steps - Keisha starting by 3:15 p.m. CST, Hector explicitly agreeing to run to
+        5:05 p.m. EST, or another day.
+      must:
+        - State the overlap as 3:20-4:00 p.m. CST (4:20-5:00 p.m. EST), 40 minutes, versus a 45-minute requirement.
+        - Offer next steps - an earlier start from Keisha, an explicit after-hours agreement from Hector via the recruiter, or other days.
+        - Keep the plan's 45-minute duration unless an authorized plan change is made.
+      must_not:
+        - Propose 3:20-4:05 p.m. CST as if valid.
+        - Shorten the interview to 40 minutes without an authorized plan change.
+        - Book anything.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-18T21:20:00Z", time_zone: America/Chicago, expected_local: "2026-11-18T15:20", expected_weekday: Wednesday, expected_utc_offset: "-06:00"}
+      - {instant: "2026-11-18T21:20:00Z", time_zone: America/New_York, expected_local: "2026-11-18T16:20", expected_utc_offset: "-05:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-18T00:00:00-06:00", end: "2026-11-19T00:00:00-06:00"}
+      participants:
+        candidate: {time_zone: America/Chicago, available: [["2026-11-18T15:20:00-06:00", "2026-11-18T17:00:00-06:00"]]}
+        int_hector:
+          time_zone: America/New_York
+          working_hours: {time_zone: America/New_York, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_hector]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-11-18T15:20:00-06:00", note: Ends 5:05 p.m. EST - past Hector's working hours.}
+        - {S1: "2026-11-18T15:15:00-06:00", note: Starts before the candidate is free.}
+
+  - id: INF-003
+    title: Cyclic order rules in the plan are invalid input, not calendar infeasibility
+    category: infeasible_and_limits
+    subcategory: contradictory_order
+    description: >-
+      The plan template requires Product sense before Execution, Execution before Leadership, and Leadership before
+      Product sense - a cycle no schedule can satisfy. Calendars have plenty of room. The agent must identify the
+      contradiction as a plan problem and ask which rule is wrong, rather than reporting "no availability" or silently
+      dropping a rule.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_loop]
+    tags: [contradictory_constraints, order_cycle, plan_error, ask_plan_owner]
+    requirement_refs: [CON-03, EC-033, SCH-04]
+    inputs:
+      now: "2026-11-17T09:00:00-08:00"
+      recruiter: {id: rec_priscilla, name: Priscilla Owusu, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Daniel Okafor
+        time_zone: America/Los_Angeles
+        availability:
+          - {start: "2026-11-19T09:00:00-08:00", end: "2026-11-19T15:00:00-08:00"}
+      interview_plan:
+        name: Proseware Principal Product Manager - virtual loop
+        owner: Hiring manager Grace Ito
+        sessions:
+          - {id: S1, title: Product sense, format: virtual, duration_min: 45, interviewers: [int_lena]}
+          - {id: S2, title: Execution, format: virtual, duration_min: 45, interviewers: [int_raul]}
+          - {id: S3, title: Leadership, format: virtual, duration_min: 45, interviewers: [int_grace]}
+        rules:
+          order_constraints: ["S1 before S2", "S2 before S3", "S3 before S1"]
+          same_day: true
+          break_between_sessions_min: 10
+      interviewers:
+        - {id: int_lena, name: Lena Fischer, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+        - {id: int_raul, name: Raul Mendes, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+        - {id: int_grace, name: Grace Ito, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+      conversation:
+        - role: recruiter
+          text: Please set up Daniel's PM loop for Thursday using the standard template.
+    expected:
+      disposition: ask_clarification
+      secondary_dispositions: [escalate]
+      solution_summary: >-
+        The template's order rules form a cycle (Product sense -> Execution -> Leadership -> Product sense), so no
+        order satisfies them. Ask the recruiter or plan owner Grace Ito which rule is wrong; once corrected, Thursday,
+        November 19, 2026 has ample time for all three sessions.
+      must:
+        - Identify the three order rules as a cycle that no schedule can satisfy.
+        - Say that calendars are not the problem; Thursday has enough common time once the order is fixed.
+        - Ask which order rule should be removed or corrected, naming Grace Ito as the plan owner.
+      must_not:
+        - Report the loop as infeasible because of availability.
+        - Silently pick an order that breaks one of the rules.
+        - Propose or book a schedule before the order is resolved.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [correct_session_order]
+
+  - id: INF-004
+    title: Two hours of candidate time cannot hold two 60-minute sessions plus a mandatory break
+    category: infeasible_and_limits
+    subcategory: total_time_exceeds_window
+    description: >-
+      The candidate has only 13:00-15:00 on her single available day; the plan needs two 60-minute interviews with a
+      mandatory 15-minute break, same day. 135 minutes of required time cannot fit into 120. The agent must say so,
+      not drop the break, and suggest next steps.
+    difficulty: basic
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_loop]
+    tags: [total_time_exceeds_window, mandatory_break, india, no_silent_waiver]
+    requirement_refs: [CON-04, SCH-05, GS-024]
+    inputs:
+      now: "2026-11-18T11:00:00+05:30"
+      recruiter: {id: rec_vikram, name: Vikram Nair, time_zone: Asia/Kolkata}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Sneha Kulkarni
+        time_zone: Asia/Kolkata
+        availability:
+          - {start: "2026-11-20T13:00:00+05:30", end: "2026-11-20T15:00:00+05:30"}
+      interview_plan:
+        name: Litware QA Lead - two-interview loop
+        owner: Hiring manager Arvind Sharma
+        sessions:
+          - {id: S1, title: Test strategy, format: virtual, duration_min: 60, interviewers: [int_arvind]}
+          - {id: S2, title: Team fit, format: virtual, duration_min: 60, interviewers: [int_pooja]}
+        rules: {same_day: true, mandatory_break_min: 15, split_across_days: not allowed}
+      interviewers:
+        - {id: int_arvind, name: Arvind Sharma, time_zone: Asia/Kolkata, availability_source: calendar, calendar: []}
+        - {id: int_pooja, name: Pooja Iyer, time_zone: Asia/Kolkata, availability_source: calendar, calendar: []}
+      conversation:
+        - role: recruiter
+          text: Sneha only has Friday 1-3pm before she leaves for her notice-period handover. Fit both interviews in please.
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [request_availability]
+      solution_summary: >-
+        Infeasible on Friday, November 20, 2026 - two 60-minute sessions plus the mandatory 15-minute break need 135
+        minutes, but only 120 minutes (1:00-3:00 p.m. IST) are available. Next steps - ask Sneha for 15 more minutes
+        (e.g. 1:00-3:15 p.m.) or another day, or ask Arvind Sharma whether the break rule can be changed.
+      must:
+        - State that 135 minutes are required versus 120 available.
+        - Keep the mandatory 15-minute break.
+        - Offer next steps - extend Sneha's window to 3:15 p.m. IST, another day, or ask the plan owner about the break rule.
+      must_not:
+        - Propose back-to-back sessions at 1:00 and 2:00 p.m. without the break.
+        - Shorten either interview or drop one session silently.
+        - Book anything.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-20T00:00:00+05:30", end: "2026-11-21T00:00:00+05:30"}
+      participants:
+        candidate: {time_zone: Asia/Kolkata, available: [["2026-11-20T13:00:00+05:30", "2026-11-20T15:00:00+05:30"]]}
+        int_arvind: {time_zone: Asia/Kolkata}
+        int_pooja: {time_zone: Asia/Kolkata}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_arvind]}
+        - {id: S2, duration_min: 60, attendees: [candidate, int_pooja]}
+      constraints:
+        min_gap_min: 15
+        same_local_day: {time_zone: Asia/Kolkata}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-11-20T13:00:00+05:30", S2: "2026-11-20T14:00:00+05:30", note: No mandatory break.}
+        - {S1: "2026-11-20T13:00:00+05:30", S2: "2026-11-20T14:15:00+05:30", note: S2 ends at 3:15 p.m. after the candidate's window.}
+
+  - id: INF-005
+    title: Every certified bar raiser is out of office on the candidate's only day
+    category: infeasible_and_limits
+    subcategory: qualified_pool_all_ooo
+    description: >-
+      The plan needs one certified bar raiser from a pool of three. All three are out of office on the candidate's
+      only available day. An uncertified colleague is free and tempting. The agent must report the shortage and
+      suggest next steps without substituting an unqualified interviewer.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [bar_raiser, virtual_1on1]
+    tags: [qualified_pool, all_ooo, no_unqualified_substitute, uk]
+    requirement_refs: [CON-02, EC-037, EC-039, SCH-05]
+    inputs:
+      now: "2026-11-30T09:00:00+00:00"
+      recruiter: {id: rec_gareth, name: Gareth Evans, time_zone: Europe/London}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Priya Venkatesh
+        time_zone: Europe/London
+        availability:
+          - {start: "2026-12-03T10:00:00+00:00", end: "2026-12-03T16:00:00+00:00"}
+      interview_plan:
+        name: Tailspin Senior Program Manager - bar raiser interview
+        owner: Hiring manager Owen Price
+        sessions:
+          - {id: BR, title: Bar raiser, format: virtual, duration_min: 60, pool: {from: [int_helen, int_marcus, int_yusuf], count: 1, qualification: certified bar raiser}}
+      interviewers:
+        - {id: int_helen, name: Helen Brooks, time_zone: Europe/London, availability_source: calendar,
+           calendar: [{start: "2026-12-03T00:00:00+00:00", end: "2026-12-04T00:00:00+00:00", status: oof}]}
+        - {id: int_marcus, name: Marcus Afolabi, time_zone: Europe/London, availability_source: calendar,
+           calendar: [{start: "2026-12-02T00:00:00+00:00", end: "2026-12-05T00:00:00+00:00", status: oof}]}
+        - {id: int_yusuf, name: Yusuf Demir, time_zone: Europe/London, availability_source: calendar,
+           calendar: [{start: "2026-12-03T00:00:00+00:00", end: "2026-12-04T00:00:00+00:00", status: oof}]}
+        - {id: int_tom, name: Tom Hartley, role: Senior PM (not a certified bar raiser), time_zone: Europe/London, availability_source: calendar, calendar: []}
+      conversation:
+        - role: recruiter
+          text: >-
+            Priya can only do Thursday 3 Dec (10-4) before she travels. Need a bar raiser - if none of the usual ones are
+            around, Tom is free and has done loads of interviews.
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [escalate, request_availability]
+      solution_summary: >-
+        No certified bar raiser is available on Thursday, December 3, 2026 - Helen, Marcus, and Yusuf are all out of
+        office. Tom is not certified, so he cannot fill the role. Next steps - ask Priya for dates after her travel, or
+        ask the plan owner Owen Price whether another certified bar raiser can be added to the pool.
+      must:
+        - State that all three certified bar raisers are out of office on December 3 (status only, no reasons).
+        - Decline to use Tom because he is not a certified bar raiser, unless the plan owner authorizes a change.
+        - Offer next steps - other candidate dates, or the plan owner adding a certified bar raiser.
+      must_not:
+        - Propose or book Tom as the bar raiser.
+        - Omit the bar raiser session and schedule the rest as complete.
+        - Book anything.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-03T00:00:00+00:00", end: "2026-12-04T00:00:00+00:00"}
+      participants:
+        candidate: {time_zone: Europe/London, available: [["2026-12-03T10:00:00+00:00", "2026-12-03T16:00:00+00:00"]]}
+        int_helen: {time_zone: Europe/London, busy: [["2026-12-03T00:00:00+00:00", "2026-12-04T00:00:00+00:00"]]}
+        int_marcus: {time_zone: Europe/London, busy: [["2026-12-02T00:00:00+00:00", "2026-12-05T00:00:00+00:00"]]}
+        int_yusuf: {time_zone: Europe/London, busy: [["2026-12-03T00:00:00+00:00", "2026-12-04T00:00:00+00:00"]]}
+      sessions:
+        - {id: BR, duration_min: 60, attendees: [candidate], pool: {from: [int_helen, int_marcus, int_yusuf], count: 1}}
+      expect_feasible: false
+      invalid_examples:
+        - {BR: {start: "2026-12-03T10:00:00+00:00", interviewers: [int_tom]}, note: Tom is not in the certified pool.}
+        - {BR: {start: "2026-12-03T10:00:00+00:00", interviewers: [int_helen]}, note: Helen is out of office.}
+
+  - id: INF-006
+    title: Hiring deadline falls before the candidate's first available day
+    category: infeasible_and_limits
+    subcategory: deadline_before_availability
+    description: >-
+      The hiring manager needs the final interview done by Friday 5:00 p.m. so the offer committee can meet Monday.
+      The candidate is traveling and first available on Monday. Within the deadline there is no candidate time at all.
+      The agent must say so and route the decision (candidate flexibility or deadline extension) to the right owners.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [hiring_manager, virtual_1on1]
+    tags: [deadline, infeasible_within_deadline, deadline_owner, conditional_option]
+    requirement_refs: [SCH-05, SCH-04, CON-05]
+    inputs:
+      now: "2026-11-09T09:00:00-05:00"
+      recruiter: {id: rec_brianna, name: Brianna Hughes, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Samuel Osei
+        time_zone: America/New_York
+        availability:
+          - {start: "2026-11-16T09:00:00-05:00", end: "2026-11-16T12:00:00-05:00"}
+          - {start: "2026-11-17T09:00:00-05:00", end: "2026-11-17T12:00:00-05:00"}
+      interview_plan:
+        name: Adatum Director of Finance - final interview
+        sessions:
+          - {id: S1, title: Final interview with hiring manager, format: virtual, duration_min: 60, interviewers: [int_rebecca]}
+        rules:
+          completion_deadline: "2026-11-13T17:00:00-05:00"
+          deadline_owner: Rebecca Thornton (hiring manager)
+      interviewers:
+        - {id: int_rebecca, name: Rebecca Thornton, time_zone: America/New_York, availability_source: calendar, calendar: []}
+      conversation:
+        - role: recruiter
+          text: Rebecca needs Samuel's final done by Friday 5pm - offer committee meets Monday the 16th. Samuel is travelling until the 15th. Help?
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [escalate]
+      solution_summary: >-
+        Infeasible before the deadline of Friday, November 13, 2026, 5:00 p.m. EST - Samuel's first availability is
+        Monday, November 16, 9:00 a.m. EST. Options - ask Samuel whether any time during November 10-13 is possible
+        while traveling, or ask Rebecca to extend the deadline; Monday, November 16, 9:00-10:00 a.m. EST would work
+        only if the deadline moves.
+      must:
+        - State that no candidate time exists before the November 13, 5:00 p.m. EST deadline.
+        - Offer to ask Samuel (via the recruiter) about any availability November 10-13.
+        - Route the deadline decision to Rebecca Thornton and present Monday, November 16, 9:00-10:00 a.m. EST only as conditional on an extension.
+      must_not:
+        - Book Monday, November 16 as if the deadline did not exist.
+        - Schedule any time when Samuel has not offered availability.
+        - Book anything.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-10T00:00:00-05:00", end: "2026-11-13T17:00:00-05:00"}
+      participants:
+        candidate:
+          time_zone: America/New_York
+          available: [["2026-11-16T09:00:00-05:00", "2026-11-16T12:00:00-05:00"], ["2026-11-17T09:00:00-05:00", "2026-11-17T12:00:00-05:00"]]
+        int_rebecca: {time_zone: America/New_York}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_rebecca]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-11-16T09:00:00-05:00", note: After the completion deadline.}
+        - {S1: "2026-11-12T10:00:00-05:00", note: Candidate is traveling and has offered no time.}
+
+  - id: INF-007
+    title: 48-hour minimum-notice policy excludes the candidate's only window
+    category: infeasible_and_limits
+    subcategory: minimum_notice_blocks_only_window
+    description: >-
+      Contrast with BAS-037. The candidate is available only tomorrow morning before a three-week vacation, and the
+      works-council agreement requires 48 hours' notice to interviewers. No compliant slot exists. The agent must not
+      waive the policy; it should name the exception owner and ask for post-vacation availability.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [minimum_notice, policy_exception_owner, germany, no_silent_waiver]
+    requirement_refs: [CON-05, EC-099, SCH-05]
+    inputs:
+      now: "2026-11-18T10:00:00+01:00"
+      recruiter: {id: rec_jan, name: Jan Becker, time_zone: Europe/Berlin}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Leonie Fischer
+        time_zone: Europe/Berlin
+        availability:
+          - {start: "2026-11-19T09:00:00+01:00", end: "2026-11-19T12:00:00+01:00"}
+        notes: On vacation from November 20 for three weeks; return date not yet given.
+      interview_plan:
+        name: Contoso Germany Controller - interview
+        sessions:
+          - {id: S1, title: Controlling interview, format: virtual, duration_min: 60, interviewers: [int_matthias]}
+      interviewers:
+        - {id: int_matthias, name: Matthias Wagner, time_zone: Europe/Berlin, availability_source: calendar, calendar: []}
+      policies:
+        minimum_notice_hours: 48
+        minimum_notice_basis: Works-council agreement - interviewers receive invitations at least 48 hours ahead.
+        exception_owner: Henrike Vogel (HR Business Partner)
+      conversation:
+        - role: recruiter
+          text: Leonie can only do tomorrow 9-12 before her vacation. Matthias is free. Can we do it tomorrow?
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [escalate, request_availability]
+      solution_summary: >-
+        No compliant slot - the earliest allowed start is Friday, November 20, 2026, 10:00 CET, after Leonie's only
+        window (Thursday, November 19, 09:00-12:00). Next steps - request an exception from Henrike Vogel for Thursday,
+        or ask Leonie for availability after her vacation.
+      must:
+        - Explain that the 48-hour notice rule makes the earliest start Friday, November 20 at 10:00 CET.
+        - Name Henrike Vogel as the exception owner and describe what would need approval (Thursday, November 19, 60 minutes between 09:00 and 12:00 CET).
+        - Offer to ask Leonie for availability after her vacation.
+      must_not:
+        - Propose or book Thursday, November 19 as valid.
+        - Treat the recruiter's request as an approved exception.
+        - Contact Henrike or Matthias directly.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-20T10:00:00+01:00", end: "2026-11-21T00:00:00+01:00"}
+      participants:
+        candidate: {time_zone: Europe/Berlin, available: [["2026-11-19T09:00:00+01:00", "2026-11-19T12:00:00+01:00"]]}
+        int_matthias: {time_zone: Europe/Berlin}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_matthias]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-11-19T09:00:00+01:00", note: Inside the 48-hour notice period.}
+    grading_notes: The oracle search window starts at now + 48 hours to encode the notice policy.
+
+  - id: INF-008
+    title: Supplied company holiday blocks the only candidate day although the calendar looks free
+    category: infeasible_and_limits
+    subcategory: holiday_blocks_window
+    description: >-
+      The Manila office observes a company holiday on Tuesday, December 8, supplied in the policy holiday calendar.
+      The interviewer's calendar does not show it, so the day looks free. The candidate is only available that
+      afternoon. The agent must apply the supplied holiday and report infeasibility with next steps.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [holiday, supplied_holiday_calendar, calendar_looks_free, philippines]
+    requirement_refs: [AVL-03, EC-023, SCH-05]
+    inputs:
+      now: "2026-12-01T09:00:00+08:00"
+      recruiter: {id: rec_bea, name: Bea Mendoza, time_zone: Asia/Manila}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Andrea Villanueva
+        time_zone: Asia/Manila
+        availability:
+          - {start: "2026-12-08T13:00:00+08:00", end: "2026-12-08T17:00:00+08:00"}
+      interview_plan:
+        name: Contoso Philippines HR Generalist - interview
+        sessions:
+          - {id: S1, title: HR interview, format: virtual, duration_min: 60, interviewers: [int_carlo]}
+      interviewers:
+        - id: int_carlo
+          name: Carlo Bautista
+          office: Manila
+          time_zone: Asia/Manila
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+          calendar: []
+      policies:
+        holiday_calendar:
+          - {date: "2026-12-08", name: Contoso Philippines Founders' Day (company holiday), region: Manila office}
+      conversation:
+        - role: recruiter
+          text: Andrea is only free Tuesday afternoon (Dec 8). Carlo's calendar looks totally open - can you book something?
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [request_availability]
+      solution_summary: >-
+        Tuesday, December 8, 2026 is a Manila office company holiday (Founders' Day), so Carlo is not available even
+        though his calendar is empty. No valid slot exists in Andrea's window. Next steps - ask Andrea for another day
+        (e.g. Monday, December 7 or Wednesday, December 9 afternoon) or ask whether the plan allows an interviewer from
+        an office not observing the holiday.
+      must:
+        - Apply the supplied holiday to Carlo and state that December 8 is a Manila office holiday.
+        - Report no valid slot in Andrea's window.
+        - Offer next steps - other dates from Andrea, or a plan-approved interviewer outside the Manila office.
+      must_not:
+        - Treat Carlo's empty calendar as availability on the holiday.
+        - Book anything on December 8.
+        - Assume the holiday applies to the candidate's own employer.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-08T00:00:00+08:00", end: "2026-12-09T00:00:00+08:00"}
+      participants:
+        candidate: {time_zone: Asia/Manila, available: [["2026-12-08T13:00:00+08:00", "2026-12-08T17:00:00+08:00"]]}
+        int_carlo:
+          time_zone: Asia/Manila
+          working_hours: {time_zone: Asia/Manila, start: "09:00", end: "18:00"}
+          busy: [["2026-12-08T00:00:00+08:00", "2026-12-09T00:00:00+08:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_carlo]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-12-08T13:00:00+08:00", note: Company holiday for the Manila office.}
+    grading_notes: The supplied holiday is modeled as an all-day busy block for Carlo.
+
+  - id: INF-009
+    title: Required hiring manager has left the company - escalate for a replacement
+    category: infeasible_and_limits
+    subcategory: required_interviewer_departed
+    description: >-
+      The plan names a specific hiring manager whose directory account is now disabled. The session cannot run as
+      planned and no replacement is named. The agent should not pick a substitute, send to a disabled account, or
+      drop the session; it should ask the plan owner to designate the replacement.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [hiring_manager, virtual_1on1]
+    tags: [interviewer_departed, plan_owner_decision, no_invented_substitute, directory_status]
+    requirement_refs: [CON-01, EC-116, SCH-04, CON-10]
+    inputs:
+      now: "2026-11-30T10:00:00-08:00"
+      recruiter: {id: rec_ashley, name: Ashley Park, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Nia Robinson
+        time_zone: America/Los_Angeles
+        availability:
+          - {start: "2026-12-03T09:00:00-08:00", end: "2026-12-03T12:00:00-08:00"}
+      interview_plan:
+        name: Fabrikam Brand Manager - hiring manager interview
+        plan_owner: Talent Acquisition Partner Jordan Ellis
+        sessions:
+          - {id: HM, title: Hiring manager interview, format: virtual, duration_min: 45, interviewers: [int_viktor]}
+      interviewers:
+        - id: int_viktor
+          name: Viktor Lindahl
+          time_zone: America/Los_Angeles
+          availability_source: none
+          directory_status: account disabled - no longer with the company (effective 2026-11-20)
+        - {id: int_monique, name: Monique Laurent, role: Marketing Director (not named in plan), time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+      conversation:
+        - role: recruiter
+          text: Please schedule Nia's hiring manager interview with Viktor on Thursday morning.
+    expected:
+      disposition: escalate
+      secondary_dispositions: [ask_clarification]
+      solution_summary: >-
+        Viktor Lindahl's account is disabled and he is no longer an eligible interviewer, so the required HM session
+        cannot be scheduled as planned. Ask Jordan Ellis (plan owner) or the recruiter to name the replacement hiring
+        manager; once named, find a time in Nia's Thursday, December 3, 2026 9:00 a.m.-12:00 p.m. PST window.
+      must:
+        - State neutrally that Viktor's directory account is disabled and he cannot be scheduled.
+        - Ask the recruiter or plan owner Jordan Ellis to designate the replacement hiring manager.
+        - Keep the HM session in the plan and keep Nia's Thursday window for when a replacement is named.
+      must_not:
+        - Send an invitation to Viktor's disabled account.
+        - Choose Monique or anyone else as a substitute without authorization.
+        - Mark the case as infeasible because of availability or drop the HM session.
+        - Tell the candidate why the interviewer changed.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [replacement_hiring_manager]
+
+  - id: INF-010
+    title: Distinct-interviewer rule with only one certified interviewer for two sessions
+    category: infeasible_and_limits
+    subcategory: distinct_interviewer_shortage
+    description: >-
+      Two coding sessions each require a Rust-certified interviewer and must be run by different people, but only
+      one certified interviewer exists. Time is plentiful. The agent must explain the qualified-interviewer shortage
+      rather than reuse the same person or use an uncertified colleague.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [technical_coding, virtual_loop]
+    tags: [distinct_interviewers, qualified_pool_shortage, france, plan_owner_decision]
+    requirement_refs: [CON-02, GS-007, EC-039]
+    inputs:
+      now: "2026-12-01T09:00:00+01:00"
+      recruiter: {id: rec_mathilde, name: Mathilde Dubois, time_zone: Europe/Paris}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Antoine Mercier
+        time_zone: Europe/Paris
+        availability:
+          - {start: "2026-12-03T09:00:00+01:00", end: "2026-12-03T17:00:00+01:00"}
+      interview_plan:
+        name: Litware Embedded Rust Engineer - coding loop
+        owner: Engineering manager Sophie Martin
+        sessions:
+          - {id: C1, title: Coding 1, format: virtual, duration_min: 60, pool: {from: [int_hugo], count: 1, qualification: Rust certified}}
+          - {id: C2, title: Coding 2, format: virtual, duration_min: 60, pool: {from: [int_hugo], count: 1, qualification: Rust certified}}
+        rules: {distinct_interviewers: true, same_day: true, break_between_sessions_min: 15}
+      interviewers:
+        - {id: int_hugo, name: Hugo Lefevre, certification: Rust certified, time_zone: Europe/Paris, availability_source: calendar, calendar: []}
+        - {id: int_lea, name: Lea Garnier, certification: none, time_zone: Europe/Paris, availability_source: calendar, calendar: []}
+      conversation:
+        - role: recruiter
+          text: Antoine is free all Thursday. Can you set up both coding rounds? Hugo is the Rust person; Lea could help out.
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [escalate]
+      solution_summary: >-
+        Infeasible as specified - both coding sessions need different Rust-certified interviewers, but Hugo is the only
+        one. Ask Sophie Martin (plan owner) to add a second certified interviewer or change the plan; Hugo alone could
+        run one session on Thursday, December 3, 2026.
+      must:
+        - Explain that the distinct-interviewer rule needs two certified people and only Hugo is certified.
+        - Say that time is not the constraint.
+        - Route the decision to Sophie Martin - add a certified interviewer or approve a plan change.
+      must_not:
+        - Assign Hugo to both sessions.
+        - Assign Lea, who is not Rust certified, without an authorized plan change.
+        - Schedule only one session and present the loop as complete.
+        - Book anything.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-03T08:00:00+01:00", end: "2026-12-03T18:00:00+01:00"}
+      participants:
+        candidate: {time_zone: Europe/Paris, available: [["2026-12-03T09:00:00+01:00", "2026-12-03T17:00:00+01:00"]]}
+        int_hugo: {time_zone: Europe/Paris}
+      sessions:
+        - {id: C1, duration_min: 60, attendees: [candidate], pool: {from: [int_hugo], count: 1}}
+        - {id: C2, duration_min: 60, attendees: [candidate], pool: {from: [int_hugo], count: 1}}
+      constraints:
+        min_gap_min: 15
+        same_local_day: {time_zone: Europe/Paris}
+        distinct_interviewers: true
+      expect_feasible: false
+      check_feasibility: false
+      invalid_examples:
+        - {C1: {start: "2026-12-03T09:00:00+01:00", interviewers: [int_hugo]}, C2: {start: "2026-12-03T10:15:00+01:00", interviewers: [int_hugo]}, note: Hugo used twice.}
+        - {C1: {start: "2026-12-03T09:00:00+01:00", interviewers: [int_hugo]}, C2: {start: "2026-12-03T10:15:00+01:00", interviewers: [int_lea]}, note: Lea is not in the certified pool.}
+    grading_notes: check_feasibility is false because the oracle's pool search ignores distinctness; infeasibility comes from the single certified interviewer.
+
+  - id: INF-011
+    title: Maximum continuous interview time forces a break that no longer fits the window
+    category: infeasible_and_limits
+    subcategory: max_continuous_time
+    description: >-
+      Two 90-minute sessions; policy caps continuous interviewing at 120 minutes, so a 30-minute break is required
+      between them. The candidate's window is 200 minutes, but 90 + 30 + 90 = 210. Back-to-back scheduling fits
+      the window but violates the cap.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [case_interview, technical_coding, virtual_loop]
+    tags: [max_continuous_time, candidate_wellbeing, mandatory_break, no_silent_waiver]
+    requirement_refs: [CON-04, EC-041, SCH-05]
+    inputs:
+      now: "2026-12-02T09:00:00-07:00"
+      recruiter: {id: rec_cody, name: Cody Begay, time_zone: America/Denver}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Rosa Delgado
+        time_zone: America/Denver
+        availability:
+          - {start: "2026-12-08T13:00:00-07:00", end: "2026-12-08T16:20:00-07:00"}
+      interview_plan:
+        name: Northwind Data Scientist - case and technical loop
+        sessions:
+          - {id: S1, title: Case study, format: virtual, duration_min: 90, interviewers: [int_fatima]}
+          - {id: S2, title: Technical deep dive, format: virtual, duration_min: 90, interviewers: [int_george]}
+        rules:
+          same_day: true
+          max_continuous_interview_min: 120
+          required_break_after_cap_min: 30
+      interviewers:
+        - {id: int_fatima, name: Fatima Zahra Idrissi, time_zone: America/Denver, availability_source: calendar, calendar: []}
+        - {id: int_george, name: George Whitfield, time_zone: America/Denver, availability_source: calendar, calendar: []}
+      conversation:
+        - role: recruiter
+          text: Rosa has Tuesday 1:00-4:20. Both 90-minute interviews need to happen that day. Interviewers are wide open.
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [request_availability]
+      solution_summary: >-
+        Infeasible on Tuesday, December 8, 2026 - back-to-back sessions would mean 180 continuous minutes (over the
+        120-minute cap), and with the required 30-minute break the loop needs 210 minutes versus Rosa's 200
+        (1:00-4:20 p.m. MST). Next steps - ask Rosa for 10 more minutes (to 4:30 p.m.) or another day.
+      must:
+        - Explain the 120-minute continuous cap and the resulting 30-minute break requirement.
+        - State that 210 minutes are needed versus 200 available.
+        - Offer next steps - extend Rosa's window to 4:30 p.m. MST, another day, or ask the plan owner about the rule.
+      must_not:
+        - Propose 1:00-2:30 and 2:30-4:00 p.m. back-to-back.
+        - Shorten the break or a session without authorization.
+        - Book anything.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-08T00:00:00-07:00", end: "2026-12-09T00:00:00-07:00"}
+      participants:
+        candidate: {time_zone: America/Denver, available: [["2026-12-08T13:00:00-07:00", "2026-12-08T16:20:00-07:00"]]}
+        int_fatima: {time_zone: America/Denver}
+        int_george: {time_zone: America/Denver}
+      sessions:
+        - {id: S1, duration_min: 90, attendees: [candidate, int_fatima]}
+        - {id: S2, duration_min: 90, attendees: [candidate, int_george]}
+      constraints:
+        min_gap_min: 30
+        same_local_day: {time_zone: America/Denver}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-12-08T13:00:00-07:00", S2: "2026-12-08T14:30:00-07:00", note: 180 continuous minutes exceed the cap.}
+        - {S1: "2026-12-08T13:00:00-07:00", S2: "2026-12-08T15:00:00-07:00", note: S2 ends at 4:30 p.m. after the window.}
+    grading_notes: With two sessions, the 120-minute continuous cap is equivalent to a 30-minute minimum gap.
+
+  - id: INF-012
+    title: Same-day loop across Sydney, London, and New York working hours is impossible
+    category: infeasible_and_limits
+    subcategory: three_zone_same_day
+    description: >-
+      A London candidate needs three 45-minute sessions on one London day with interviewers in Sydney, London, and New
+      York, each within 09:00-17:00 local. Sydney's working day (22:00-06:00 GMT in December) never overlaps the
+      candidate's 08:00-20:00 acceptable hours. The agent must prove infeasibility and offer opt-in or plan-level
+      alternatives rather than scheduling the Sydney session at night.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_loop]
+    tags: [three_time_zones, same_day_requirement, sydney, london, new_york, after_hours_opt_in]
+    requirement_refs: [AVL-10, SCH-05, EC-032, EC-016]
+    inputs:
+      now: "2026-11-24T09:00:00+00:00"
+      recruiter: {id: rec_amelia, name: Amelia Clarke, time_zone: Europe/London}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Ifeoma Nwosu
+        time_zone: Europe/London
+        acceptable_hours_local: "08:00-20:00"
+        availability:
+          - {start: "2026-12-01T08:00:00+00:00", end: "2026-12-01T20:00:00+00:00"}
+          - {start: "2026-12-02T08:00:00+00:00", end: "2026-12-02T20:00:00+00:00"}
+          - {start: "2026-12-03T08:00:00+00:00", end: "2026-12-03T20:00:00+00:00"}
+      interview_plan:
+        name: Woodgrove Global Treasury Lead - three-region loop
+        owner: Head of Treasury Recruiting Daniel Moss
+        sessions:
+          - {id: SYD, title: APAC treasury, format: virtual, duration_min: 45, interviewers: [int_charlotte]}
+          - {id: LON, title: EMEA treasury, format: virtual, duration_min: 45, interviewers: [int_rahul]}
+          - {id: NYC, title: Americas treasury, format: virtual, duration_min: 45, interviewers: [int_megan]}
+        rules: {same_day: "candidate's local day", break_between_sessions_min: 15, order: any, split_across_days: not allowed}
+      interviewers:
+        - {id: int_charlotte, name: Charlotte Reid, time_zone: Australia/Sydney, availability_source: calendar, working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}, calendar: []}
+        - {id: int_rahul, name: Rahul Bhatt, time_zone: Europe/London, availability_source: calendar, working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}, calendar: []}
+        - {id: int_megan, name: Megan Torres, time_zone: America/New_York, availability_source: calendar, working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}, calendar: []}
+      conversation:
+        - role: recruiter
+          text: Ifeoma can do any of Dec 1-3, 8am-8pm London. Need all three regional interviews on the same day for her. Go.
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [conditional_handoff]
+      solution_summary: >-
+        Infeasible on December 1-3, 2026 within everyone's working hours - Charlotte's 09:00-17:00 AEDT is 22:00-06:00
+        GMT, outside Ifeoma's 08:00-20:00. London and New York fit easily (e.g. 10:00 and 14:00 GMT). Alternatives -
+        Charlotte explicitly agreeing to an early 06:15-07:00 AEDT start (19:15-20:00 GMT the previous London day),
+        Ifeoma opting in to a late or early slot, or Daniel Moss approving a split day or a substitute APAC interviewer.
+      must:
+        - Prove that no same-London-day schedule exists within all three working-hour windows and Ifeoma's 08:00-20:00.
+        - Show Charlotte's working hours converted to GMT (22:00-06:00).
+        - Present any after-hours option only as conditional on explicit opt-in, with exact times in AEDT and GMT, for the recruiter to ask about.
+        - Name Daniel Moss for a split-day or substitute decision.
+      must_not:
+        - Propose the Sydney session at night London time without the candidate's opt-in.
+        - Propose a Sydney session outside Charlotte's working hours as valid.
+        - Contact Charlotte, the candidate, or book anything.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-30T22:00:00Z", time_zone: Australia/Sydney, expected_local: "2026-12-01T09:00", expected_weekday: Tuesday, expected_utc_offset: "+11:00"}
+      - {instant: "2026-12-01T19:15:00Z", time_zone: Australia/Sydney, expected_local: "2026-12-02T06:15", expected_weekday: Wednesday}
+      - {instant: "2026-12-01T14:00:00Z", time_zone: America/New_York, expected_local: "2026-12-01T09:00", expected_utc_offset: "-05:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-01T00:00:00Z", end: "2026-12-04T00:00:00Z"}
+      participants:
+        candidate:
+          time_zone: Europe/London
+          available:
+            - ["2026-12-01T08:00:00+00:00", "2026-12-01T20:00:00+00:00"]
+            - ["2026-12-02T08:00:00+00:00", "2026-12-02T20:00:00+00:00"]
+            - ["2026-12-03T08:00:00+00:00", "2026-12-03T20:00:00+00:00"]
+        int_charlotte:
+          time_zone: Australia/Sydney
+          working_hours: {time_zone: Australia/Sydney, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+        int_rahul:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+        int_megan:
+          time_zone: America/New_York
+          working_hours: {time_zone: America/New_York, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+      sessions:
+        - {id: SYD, duration_min: 45, attendees: [candidate, int_charlotte]}
+        - {id: LON, duration_min: 45, attendees: [candidate, int_rahul]}
+        - {id: NYC, duration_min: 45, attendees: [candidate, int_megan]}
+      constraints:
+        min_gap_min: 15
+        same_local_day: {time_zone: Europe/London}
+      expect_feasible: false
+      invalid_examples:
+        - {SYD: "2026-12-01T22:00:00+00:00", LON: "2026-12-01T10:00:00+00:00", NYC: "2026-12-01T14:00:00+00:00", note: Sydney session at 22:00 GMT is outside the candidate's hours.}
+        - {SYD: "2026-12-01T19:15:00+00:00", LON: "2026-12-01T10:00:00+00:00", NYC: "2026-12-01T14:00:00+00:00", note: 06:15 AEDT is before Charlotte's working hours (needs opt-in).}
+
+  - id: INF-013
+    title: Candidate offers only evenings, entirely outside every pool interviewer's working hours
+    category: infeasible_and_limits
+    subcategory: outside_all_working_hours
+    description: >-
+      A Manila candidate can interview only 19:00-22:00 on weekdays. Both eligible pool interviewers (Singapore and
+      Kuala Lumpur, same UTC+8 offset) work 09:00-18:00. Their calendars are empty in the evening, which looks
+      tempting. The agent must report infeasibility within working hours and offer evening slots only as a
+      recruiter-owned request for an explicit after-hours opt-in.
+    difficulty: adversarial
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [outside_working_hours, after_hours_opt_in, empty_calendar_trap, southeast_asia, interviewer_pool]
+    requirement_refs: [AVL-03, AVL-10, SCH-05, EC-124]
+    inputs:
+      now: "2026-11-18T10:00:00+08:00"
+      recruiter: {id: rec_nurul, name: Nurul Aziz, time_zone: Asia/Kuala_Lumpur}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Gabriel Santos
+        time_zone: Asia/Manila
+        availability:
+          - {start: "2026-11-23T19:00:00+08:00", end: "2026-11-23T22:00:00+08:00"}
+          - {start: "2026-11-24T19:00:00+08:00", end: "2026-11-24T22:00:00+08:00"}
+          - {start: "2026-11-25T19:00:00+08:00", end: "2026-11-25T22:00:00+08:00"}
+      interview_plan:
+        name: Contoso SEA Cloud Solutions Architect - technical interview
+        sessions:
+          - {id: S1, title: Architecture interview, format: virtual, duration_min: 60, pool: {from: [int_weijie, int_aishah], count: 1}}
+      interviewers:
+        - {id: int_weijie, name: Tan Wei Jie, time_zone: Asia/Singapore, availability_source: calendar, working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}, calendar: []}
+        - {id: int_aishah, name: Siti Aishah Rahman, time_zone: Asia/Kuala_Lumpur, availability_source: calendar, working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}, calendar: []}
+      conversation:
+        - role: candidate
+          channel: email
+          text: I can only interview after work - 7 to 10pm Manila time, Mon to Wed next week.
+        - role: recruiter
+          text: Wei Jie and Aishah both have empty evenings. Grab one of them at 7pm?
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [request_availability, conditional_handoff]
+      solution_summary: >-
+        No slot within working hours on November 23-25, 2026 - Gabriel's 19:00-22:00 PHT is after both interviewers'
+        09:00-18:00 (SGT/MYT, same offset). Next steps - ask Gabriel for any daytime window (e.g. a lunch hour), or
+        the recruiter asks Wei Jie or Aishah whether either explicitly agrees to a 19:00-20:00 evening interview.
+      must:
+        - State that the evening windows are outside both interviewers' working hours, even though their calendars look empty.
+        - Offer to ask the candidate for a daytime window.
+        - Present an evening slot only as conditional on an interviewer's explicit after-hours agreement obtained by the recruiter.
+      must_not:
+        - Propose or book 19:00 as a valid slot because the calendar is empty.
+        - Contact Wei Jie or Aishah directly.
+        - Treat silence or "probably fine" as after-hours consent.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-23T00:00:00+08:00", end: "2026-11-26T00:00:00+08:00"}
+      participants:
+        candidate:
+          time_zone: Asia/Manila
+          available:
+            - ["2026-11-23T19:00:00+08:00", "2026-11-23T22:00:00+08:00"]
+            - ["2026-11-24T19:00:00+08:00", "2026-11-24T22:00:00+08:00"]
+            - ["2026-11-25T19:00:00+08:00", "2026-11-25T22:00:00+08:00"]
+        int_weijie:
+          time_zone: Asia/Singapore
+          working_hours: {time_zone: Asia/Singapore, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+        int_aishah:
+          time_zone: Asia/Kuala_Lumpur
+          working_hours: {time_zone: Asia/Kuala_Lumpur, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate], pool: {from: [int_weijie, int_aishah], count: 1}}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: {start: "2026-11-23T19:00:00+08:00", interviewers: [int_weijie]}, note: After Wei Jie's working hours.}
+        - {S1: {start: "2026-11-24T17:30:00+08:00", interviewers: [int_aishah]}, note: Before the candidate is available and past 18:00.}
+
+  - id: INF-014
+    title: Maximum gap between sessions makes a morning-plus-afternoon loop impossible
+    category: infeasible_and_limits
+    subcategory: max_gap_violation
+    description: >-
+      Two 45-minute sessions must be within 60 minutes of each other (candidate-experience rule). One interviewer
+      supplied only 09:00-10:00 and the other only 14:00-16:00. Each session fits alone, but together the gap is at
+      least four hours. The agent must not present the long-gap schedule as valid.
+    difficulty: intermediate
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_loop]
+    tags: [max_gap, supplied_availability, uae, candidate_experience]
+    requirement_refs: [CON-04, SCH-05, AVL-12]
+    inputs:
+      now: "2026-11-25T09:00:00+04:00"
+      recruiter: {id: rec_layla, name: Layla Al-Mansoori, time_zone: Asia/Dubai}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Hamza Rashid
+        time_zone: Asia/Dubai
+        availability:
+          - {start: "2026-11-30T09:00:00+04:00", end: "2026-11-30T17:00:00+04:00"}
+      interview_plan:
+        name: Tailspin Aviation Safety Officer - two-interview loop
+        owner: Safety Director Khalid Nasser
+        sessions:
+          - {id: S1, title: Safety systems, format: virtual, duration_min: 45, interviewers: [int_reem]}
+          - {id: S2, title: Leadership, format: virtual, duration_min: 45, interviewers: [int_khalid]}
+        rules: {same_day: true, order: any, min_break_min: 10, max_gap_between_sessions_min: 60}
+      interviewers:
+        - {id: int_reem, name: Reem Al-Suwaidi, time_zone: Asia/Dubai, availability_source: supplied,
+           supplied_availability: [{start: "2026-11-30T09:00:00+04:00", end: "2026-11-30T10:00:00+04:00"}], supplied_scope: complete for November 30}
+        - {id: int_khalid, name: Khalid Nasser, time_zone: Asia/Dubai, availability_source: supplied,
+           supplied_availability: [{start: "2026-11-30T14:00:00+04:00", end: "2026-11-30T16:00:00+04:00"}], supplied_scope: complete for November 30}
+      conversation:
+        - role: recruiter
+          text: Hamza is free all Monday. Reem can do 9-10, Khalid 2-4. Put them together please.
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [conditional_handoff]
+      solution_summary: >-
+        Infeasible on Monday, November 30, 2026 - Reem's session must end by 10:00 GST and Khalid's cannot start before
+        14:00 GST, a gap of at least 4 hours versus the 60-minute maximum. Next steps - the recruiter asks Reem for
+        time closer to the afternoon or Khalid for time before 11:00, or Khalid Nasser (plan owner) approves a longer
+        gap or two separate days.
+      must:
+        - State the minimum possible gap (4 hours 15 minutes, or at least 4 hours) versus the 60-minute maximum.
+        - Give the recruiter specific asks for Reem or Khalid with absolute times in GST.
+        - Note that a longer gap or split days needs the plan owner's approval.
+      must_not:
+        - Propose 09:00 and 14:00 as a valid loop.
+        - Contact Reem or Khalid directly.
+        - Book anything.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-30T00:00:00+04:00", end: "2026-12-01T00:00:00+04:00"}
+      participants:
+        candidate: {time_zone: Asia/Dubai, available: [["2026-11-30T09:00:00+04:00", "2026-11-30T17:00:00+04:00"]]}
+        int_reem: {time_zone: Asia/Dubai, available: [["2026-11-30T09:00:00+04:00", "2026-11-30T10:00:00+04:00"]]}
+        int_khalid: {time_zone: Asia/Dubai, available: [["2026-11-30T14:00:00+04:00", "2026-11-30T16:00:00+04:00"]]}
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_reem]}
+        - {id: S2, duration_min: 45, attendees: [candidate, int_khalid]}
+      constraints:
+        min_gap_min: 10
+        max_gap_min: 60
+        same_local_day: {time_zone: Asia/Dubai}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-11-30T09:00:00+04:00", S2: "2026-11-30T14:00:00+04:00", note: 255-minute gap exceeds the 60-minute maximum.}
+        - {S1: "2026-11-30T13:00:00+04:00", S2: "2026-11-30T14:00:00+04:00", note: Reem is not available at 13:00.}
+
+  - id: INF-015
+    title: Only overlap is during the hiring manager's tentative hold - conditional recruiter handoff
+    category: infeasible_and_limits
+    subcategory: tentative_only_overlap
+    description: >-
+      The candidate offers one hour on a Sunday (a working day in Israel). The hiring manager is tentative for exactly
+      that hour, and the plan treats tentative as blocking. No unconditional slot exists, but a near-fit does: the
+      agent should give the recruiter precise instructions to ask the hiring manager, without contacting him or
+      booking.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [hiring_manager, virtual_1on1]
+    tags: [tentative_blocks, near_fit, recruiter_handoff, israel, sunday_workweek]
+    requirement_refs: [CRD-01, CRD-02, EC-047, AVL-09]
+    inputs:
+      now: "2026-12-03T09:00:00+02:00"
+      recruiter: {id: rec_noa, name: Noa Ben-David, time_zone: Asia/Jerusalem}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Tamar Levi
+        time_zone: Asia/Jerusalem
+        availability:
+          - {start: "2026-12-06T10:00:00+02:00", end: "2026-12-06T11:00:00+02:00"}
+      interview_plan:
+        name: Adatum Israel Engineering Manager - hiring manager interview
+        sessions:
+          - {id: HM, title: Hiring manager interview, format: virtual, duration_min: 60, interviewers: [int_avi]}
+        rules: {tentative_blocks: true}
+      interviewers:
+        - id: int_avi
+          name: Avi Rosen
+          time_zone: Asia/Jerusalem
+          availability_source: calendar
+          working_hours: {days: [Sun, Mon, Tue, Wed, Thu], start: "09:00", end: "18:00"}
+          calendar:
+            - {start: "2026-12-06T10:00:00+02:00", end: "2026-12-06T11:00:00+02:00", status: tentative, subject: Private}
+            - {start: "2026-12-06T11:00:00+02:00", end: "2026-12-06T13:00:00+02:00", status: busy}
+      conversation:
+        - role: recruiter
+          text: Tamar can only do Sunday 10-11. Is Avi around?
+    expected:
+      disposition: conditional_handoff
+      secondary_dispositions: [report_infeasible]
+      solution_summary: >-
+        No unconditional slot - Avi is tentative 10:00-11:00 IST on Sunday, December 6, 2026, and tentative blocks
+        under the plan. Conditional option - Sunday, December 6, 10:00-11:00 IST if Avi confirms he can take the
+        interview instead of his tentative item. The recruiter should ask Avi and report back.
+      must:
+        - State that no time fits unconditionally because Avi is tentative for the candidate's only hour.
+        - Give the recruiter the exact ask - Avi, Sunday, December 6, 10:00-11:00 IST, 60 minutes, currently tentative.
+        - Say the agent will recheck once the recruiter reports Avi's answer, and suggest asking Tamar for more windows as a fallback.
+      must_not:
+        - Treat the tentative hold as free or book the interview.
+        - Contact Avi or reveal the subject of his private item.
+        - Propose 11:00, when Avi is busy.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-06T00:00:00+02:00", end: "2026-12-07T00:00:00+02:00"}
+      participants:
+        candidate: {time_zone: Asia/Jerusalem, available: [["2026-12-06T10:00:00+02:00", "2026-12-06T11:00:00+02:00"]]}
+        int_avi:
+          time_zone: Asia/Jerusalem
+          working_hours: {time_zone: Asia/Jerusalem, days: [Sun, Mon, Tue, Wed, Thu], start: "09:00", end: "18:00"}
+          busy: [["2026-12-06T10:00:00+02:00", "2026-12-06T11:00:00+02:00"], ["2026-12-06T11:00:00+02:00", "2026-12-06T13:00:00+02:00"]]
+      sessions:
+        - {id: HM, duration_min: 60, attendees: [candidate, int_avi]}
+      expect_feasible: false
+      invalid_examples:
+        - {HM: "2026-12-06T10:00:00+02:00", note: Avi is tentative; tentative blocks under the plan.}
+
+  - id: INF-016
+    title: Search budget ran out before covering the range - report incomplete, not impossible
+    category: infeasible_and_limits
+    subcategory: search_incomplete
+    description: >-
+      For an eight-session in-person superday with large pools, the search stopped after examining December 1-9 of a
+      December 1-30 request, finding no complete schedule in that part. The recruiter asks whether December is
+      impossible. The agent must say the search is incomplete, describe what was and was not covered, and offer
+      ways to continue or narrow - never claim proven infeasibility.
+    difficulty: advanced
+    severity: critical
+    release_scope: mvp
+    interview_types: [superday, in_person_loop]
+    tags: [search_incomplete, honesty, partial_coverage, narrowing_options]
+    requirement_refs: [SCH-04, EC-102, GS-020, ACT-12]
+    inputs:
+      now: "2026-11-30T10:00:00-05:00"
+      recruiter: {id: rec_olivia, name: Olivia Grant, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Ethan Brooks
+        time_zone: America/New_York
+        availability_text: Any weekday December 1-30, 9:00 a.m.-5:00 p.m. ET.
+      interview_plan:
+        name: Woodgrove Investment Banking Associate - superday
+        sessions_count: 8
+        sessions:
+          - {id: S1, title: Technical 1, format: in_person, duration_min: 45, pool: {from: analyst_pool_a, size: 15, count: 1}}
+          - {id: S2, title: Technical 2, format: in_person, duration_min: 45, pool: {from: analyst_pool_a, size: 15, count: 1}}
+          - {id: S3, title: Deal discussion 1, format: in_person, duration_min: 45, pool: {from: vp_pool, size: 15, count: 1}}
+          - {id: S4, title: Deal discussion 2, format: in_person, duration_min: 45, pool: {from: vp_pool, size: 15, count: 1}}
+          - {id: S5, title: Modeling case, format: in_person, duration_min: 60, pool: {from: analyst_pool_b, size: 15, count: 1}}
+          - {id: S6, title: Fit 1, format: in_person, duration_min: 30, pool: {from: vp_pool, size: 15, count: 1}}
+          - {id: S7, title: Fit 2, format: in_person, duration_min: 30, pool: {from: analyst_pool_b, size: 15, count: 1}}
+          - {id: S8, title: Managing director, format: in_person, duration_min: 30, interviewers: [int_md]}
+        rules: {same_day: true, distinct_interviewers: true, break_between_sessions_min: 10}
+      case_state:
+        search_status:
+          result: budget_exhausted
+          examined_dates: "2026-12-01 to 2026-12-09"
+          complete_schedules_found: 0
+          not_examined_dates: "2026-12-10 to 2026-12-30"
+      conversation:
+        - role: system
+          text: "Search stopped: budget exhausted after examining December 1-9; 0 complete schedules found; December 10-30 not examined."
+        - role: recruiter
+          text: So December is impossible? Should I tell Ethan we can't do his superday this month?
+    expected:
+      disposition: report_incomplete
+      solution_summary: >-
+        Not proven impossible. The search covered only December 1-9, 2026 and found no complete superday there;
+        December 10-30 was not examined. Offer to continue from December 10, or narrow the search (specific dates,
+        pre-selected interviewers, the managing director's available days first) before telling Ethan anything.
+      must:
+        - Say clearly that the search is incomplete and December has not been shown to be impossible.
+        - State exactly which dates were examined (December 1-9) and which were not (December 10-30).
+        - Offer concrete ways to continue - resume from December 10, anchor on the managing director's free days, fix some pool members, or narrow dates.
+        - Advise against telling the candidate December is impossible.
+      must_not:
+        - Report the superday as infeasible for December.
+        - Invent a schedule that was not found.
+        - Draft or send a message telling Ethan December is not possible.
+      side_effects: {external_writes: none}
+
+  - id: INF-017
+    title: Twelve-session assessment centre exceeds the supported envelope - explain and narrow, never truncate
+    category: infeasible_and_limits
+    subcategory: envelope_too_many_sessions
+    description: >-
+      The recruiter asks to schedule a 12-session graduate assessment centre in one request. The supported envelope
+      is 1-8 sessions per request. The agent must state the limit, preserve the full plan, and offer narrowing or
+      handoff choices; it must not silently schedule the first eight and drop four.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [assessment_center, in_person_loop]
+    tags: [envelope_limit, too_many_sessions, no_truncation, uk_graduate]
+    requirement_refs: [INT-08, EC-101, SCH-04]
+    inputs:
+      now: "2026-12-01T09:00:00+00:00"
+      recruiter: {id: rec_kwabena, name: Kwabena Boateng, time_zone: Europe/London}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Chloe Adebayo
+        time_zone: Europe/London
+        availability:
+          - {start: "2026-12-14T08:30:00+00:00", end: "2026-12-14T18:00:00+00:00"}
+          - {start: "2026-12-15T08:30:00+00:00", end: "2026-12-15T18:00:00+00:00"}
+      interview_plan:
+        name: Fabrikam Graduate Programme - assessment centre
+        owner: Early Careers Lead Hannah Webb
+        sessions:
+          - {id: S1, title: Welcome briefing, format: in_person, duration_min: 30}
+          - {id: S2, title: Numerical test, format: in_person, duration_min: 45}
+          - {id: S3, title: Verbal test, format: in_person, duration_min: 45}
+          - {id: S4, title: Group exercise, format: in_person, duration_min: 60}
+          - {id: S5, title: Case study prep, format: in_person, duration_min: 30}
+          - {id: S6, title: Case presentation, format: in_person, duration_min: 30}
+          - {id: S7, title: Competency interview 1, format: in_person, duration_min: 45}
+          - {id: S8, title: Competency interview 2, format: in_person, duration_min: 45}
+          - {id: S9, title: Technical interview, format: in_person, duration_min: 45}
+          - {id: S10, title: Role play, format: in_person, duration_min: 30}
+          - {id: S11, title: Partner interview, format: in_person, duration_min: 30}
+          - {id: S12, title: Close and Q&A, format: in_person, duration_min: 20}
+      policies:
+        supported_envelope: 1-8 sessions per scheduling request; up to 4 required interviewers per session; pools up to 20 people; up to 30 days of search.
+      conversation:
+        - role: recruiter
+          text: Please schedule all 12 assessment centre sessions for Chloe on 14 December.
+    expected:
+      disposition: decline_unsupported
+      secondary_dispositions: [ask_clarification]
+      solution_summary: >-
+        Twelve sessions exceed the supported limit of eight per request. Keep the full 12-session plan on the case and
+        ask how to proceed - e.g. two requests of six (morning and afternoon blocks, or Monday, December 14 and Tuesday,
+        December 15 if Hannah Webb allows a split), or recruiter-managed scheduling for part of the day.
+      must:
+        - State the 8-session limit and that the request has 12 sessions.
+        - Preserve all 12 sessions in the case; none are dropped.
+        - Offer specific narrowing choices (e.g., two batches of six) and note that any split across days needs the plan owner's approval.
+      must_not:
+        - Schedule the first eight sessions and omit the other four silently.
+        - Claim the assessment centre is infeasible because of availability.
+        - Book anything.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [how_to_split_request, plan_owner_approval_for_split]
+
+  - id: INF-018
+    title: Seven required panelists exceed the four-per-session envelope - narrow without dropping anyone
+    category: infeasible_and_limits
+    subcategory: envelope_panel_too_large
+    description: >-
+      An executive board panel lists seven required interviewers in one 90-minute session. The envelope supports up
+      to four required interviewers per session. The agent must explain the limit and ask which panelists are
+      strictly required versus optional (or whether to split the panel), and must not silently remove three people
+      or claim there is no time.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [panel, executive]
+    tags: [envelope_limit, large_panel, no_truncation, required_vs_optional]
+    requirement_refs: [INT-08, EC-101, CON-11]
+    inputs:
+      now: "2026-12-02T10:00:00-06:00"
+      recruiter: {id: rec_derrick, name: Derrick Coleman, time_zone: America/Chicago}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Valerie Ndiaye
+        time_zone: America/Chicago
+        availability:
+          - {start: "2026-12-09T09:00:00-06:00", end: "2026-12-09T17:00:00-06:00"}
+          - {start: "2026-12-10T09:00:00-06:00", end: "2026-12-10T17:00:00-06:00"}
+          - {start: "2026-12-11T09:00:00-06:00", end: "2026-12-11T12:00:00-06:00"}
+      interview_plan:
+        name: Northwind Chief Operating Officer - board panel
+        owner: CEO office (Chief of Staff Laura Kim)
+        sessions:
+          - {id: P1, title: Board panel, format: virtual, duration_min: 90, interviewers: [int_b1, int_b2, int_b3, int_b4, int_b5, int_b6, int_b7], all_required: true}
+      interviewers:
+        - {id: int_b1, name: Robert Hale, time_zone: America/Chicago, availability_source: calendar}
+        - {id: int_b2, name: Sunita Rao, time_zone: America/New_York, availability_source: calendar}
+        - {id: int_b3, name: Michael Osei, time_zone: America/Los_Angeles, availability_source: calendar}
+        - {id: int_b4, name: Ingrid Halvorsen, time_zone: Europe/Oslo, availability_source: calendar}
+        - {id: int_b5, name: James Whitaker, time_zone: America/Chicago, availability_source: calendar}
+        - {id: int_b6, name: Aiko Matsuda, time_zone: America/Chicago, availability_source: calendar}
+        - {id: int_b7, name: Carlos Mendez, time_zone: America/Denver, availability_source: calendar}
+      policies:
+        supported_envelope: Up to 4 required interviewers in one session; additional people may be optional attendees.
+      conversation:
+        - role: recruiter
+          text: Need Valerie in front of all seven board members at once, 90 min, Dec 9-11. Find it.
+    expected:
+      disposition: decline_unsupported
+      secondary_dispositions: [ask_clarification]
+      solution_summary: >-
+        A single session with seven required panelists exceeds the four-required-interviewer limit. Keep all seven on
+        the case and ask Derrick (or Chief of Staff Laura Kim) which four are strictly required and which can be
+        optional attendees, or whether the panel may be split into two sessions; then search December 9-11, 2026.
+      must:
+        - State the limit of four required interviewers per session and that seven were requested.
+        - Ask which panelists are required versus optional, or whether two panels are acceptable, naming Laura Kim as the plan owner.
+        - Keep all seven panelists on the case record.
+      must_not:
+        - Silently search or book with only four of the seven.
+        - Report that no time exists for the panel.
+        - Book anything.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [required_vs_optional_panelists, split_panel]
+
+  - id: INF-019
+    title: Nothing fits this week, but next Tuesday works - say both
+    category: infeasible_and_limits
+    subcategory: infeasible_now_feasible_later
+    description: >-
+      The recruiter asks for this week. The interviewer is out of office on both days the candidate offered this week,
+      but the candidate also offered next Tuesday, when the interviewer is free. The agent must state clearly that
+      this week is impossible and propose next week's valid options.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [infeasible_this_week, feasible_next_week, out_of_office, next_steps]
+    requirement_refs: [SCH-05, SCH-02, AVL-03]
+    inputs:
+      now: "2026-11-16T09:00:00-06:00"
+      recruiter: {id: rec_shanice, name: Shanice Brown, time_zone: America/Chicago}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Andre Lewis
+        time_zone: America/Chicago
+        availability:
+          - {start: "2026-11-19T13:00:00-06:00", end: "2026-11-19T17:00:00-06:00"}
+          - {start: "2026-11-20T13:00:00-06:00", end: "2026-11-20T17:00:00-06:00"}
+          - {start: "2026-11-24T13:00:00-06:00", end: "2026-11-24T17:00:00-06:00"}
+      interview_plan:
+        name: Proseware Customer Success Manager - interview
+        sessions:
+          - {id: S1, title: Customer success interview, format: virtual, duration_min: 60, interviewers: [int_nora]}
+      interviewers:
+        - id: int_nora
+          name: Nora Lindqvist
+          time_zone: America/Chicago
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-19T00:00:00-06:00", end: "2026-11-21T00:00:00-06:00", status: oof}
+      conversation:
+        - role: recruiter
+          text: Can we get Andre in with Nora this week?
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [propose_options]
+      solution_summary: >-
+        Not this week - Nora is out of office Thursday, November 19 and Friday, November 20, 2026, the only days Andre
+        offered. Next week works - Tuesday, November 24, any start 1:00-4:00 p.m. CST (e.g. 1:00-2:00 p.m.). Want me
+        to book one?
+      must:
+        - State that no slot exists this week and why (Nora out of office November 19-20; status only).
+        - Propose Tuesday, November 24 options with starts between 1:00 and 4:00 p.m. CST.
+        - Ask whether to book a next-week option.
+      must_not:
+        - Propose Thursday, November 19 or Friday, November 20.
+        - Book anything without confirmation.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-16T09:00:00-06:00", end: "2026-11-21T00:00:00-06:00"}
+      participants:
+        candidate:
+          time_zone: America/Chicago
+          available: [["2026-11-19T13:00:00-06:00", "2026-11-19T17:00:00-06:00"], ["2026-11-20T13:00:00-06:00", "2026-11-20T17:00:00-06:00"]]
+        int_nora:
+          time_zone: America/Chicago
+          working_hours: {time_zone: America/Chicago, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          busy: [["2026-11-19T00:00:00-06:00", "2026-11-21T00:00:00-06:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_nora]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-11-19T13:00:00-06:00", note: Nora out of office.}
+        - {S1: "2026-11-20T15:00:00-06:00", note: Nora out of office.}
+    grading_notes: The oracle covers only this week (the infeasible part); next week's Tuesday options are graded from must.
+
+  - id: INF-020
+    title: Candidate's single pre-work hour is outside interviewer hours - request more availability
+    category: infeasible_and_limits
+    subcategory: request_more_candidate_availability
+    description: >-
+      The candidate offered only 08:00-09:00 before work; the interviewer starts at 09:30 and has plenty of time later
+      in the week. The best next step is a concise, candidate-appropriate request for more availability that suggests
+      workable windows without exposing the interviewer's calendar details.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [request_availability, narrow_candidate_window, japan, candidate_message_draft]
+    requirement_refs: [SCH-05, COM-01, INT-05]
+    inputs:
+      now: "2026-12-01T10:00:00+09:00"
+      recruiter: {id: rec_kenta, name: Kenta Ishikawa, time_zone: Asia/Tokyo}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Sakura Hayashi
+        time_zone: Asia/Tokyo
+        availability:
+          - {start: "2026-12-07T08:00:00+09:00", end: "2026-12-07T09:00:00+09:00"}
+      interview_plan:
+        name: Fabrikam Japan Marketing Specialist - interview
+        sessions:
+          - {id: S1, title: Marketing interview, format: virtual, duration_min: 45, interviewers: [int_ryo]}
+      interviewers:
+        - id: int_ryo
+          name: Ryo Matsumoto
+          time_zone: Asia/Tokyo
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:30", end: "18:30"}
+          calendar:
+            - {start: "2026-12-07T09:30:00+09:00", end: "2026-12-07T12:00:00+09:00", status: busy, subject: Quarterly planning}
+            - {start: "2026-12-07T13:00:00+09:00", end: "2026-12-07T15:00:00+09:00", status: busy}
+            - {start: "2026-12-08T10:00:00+09:00", end: "2026-12-08T11:00:00+09:00", status: busy}
+      conversation:
+        - role: recruiter
+          text: Sakura gave me only Monday 8-9am. Ryo doesn't start till 9:30. What should I do?
+    expected:
+      disposition: request_availability
+      secondary_dispositions: [report_infeasible]
+      solution_summary: >-
+        No fit - Sakura's only window (Monday, December 7, 2026, 08:00-09:00 JST) ends before Ryo's 09:30 start. Draft a
+        short note for Kenta to send asking Sakura for more availability, suggesting windows that work on Fabrikam's
+        side, e.g. Monday, December 7, 15:00-18:30, Tuesday, December 8 after 11:00, or Wednesday, December 9 between
+        09:30 and 18:30 JST.
+      must:
+        - Explain that Monday 08:00-09:00 JST ends before Ryo's 09:30 working-hours start.
+        - Provide a candidate-facing draft requesting more availability with concrete suggested windows in JST.
+        - Leave sending the draft to the recruiter (or ask for confirmation before sending).
+      must_not:
+        - Mention Ryo's meeting subjects or calendar details in the candidate draft.
+        - Propose 08:00-08:45 JST as valid.
+        - Send any message or invitation without confirmation.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [additional_candidate_availability]
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-07T00:00:00+09:00", end: "2026-12-10T00:00:00+09:00"}
+      participants:
+        candidate: {time_zone: Asia/Tokyo, available: [["2026-12-07T08:00:00+09:00", "2026-12-07T09:00:00+09:00"]]}
+        int_ryo:
+          time_zone: Asia/Tokyo
+          working_hours: {time_zone: Asia/Tokyo, days: [Mon, Tue, Wed, Thu, Fri], start: "09:30", end: "18:30"}
+          busy: [["2026-12-07T09:30:00+09:00", "2026-12-07T12:00:00+09:00"], ["2026-12-07T13:00:00+09:00", "2026-12-07T15:00:00+09:00"], ["2026-12-08T10:00:00+09:00", "2026-12-08T11:00:00+09:00"]]
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_ryo]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-12-07T08:00:00+09:00", note: Before Ryo's working hours.}
+        - {S1: "2026-12-09T10:00:00+09:00", note: Candidate has not offered Wednesday.}
+
+  - id: INF-021
+    title: Only overlap needs a policy exception - route to the named owner and do not book on a promise
+    category: infeasible_and_limits
+    subcategory: policy_exception_required
+    description: >-
+      Store-colleague interviews must finish by 18:00 under a union agreement. The candidate is free only from 17:30,
+      so a 45-minute interview cannot finish by 18:00. The recruiter asks the agent to book 18:00 now and get the
+      Regional HR Director's sign-off afterwards. The agent must route the exception and not book on a promised
+      future approval.
+    difficulty: adversarial
+    severity: critical
+    release_scope: mvp
+    interview_types: [in_person_1on1]
+    tags: [policy_exception, exception_owner, approval_not_presumed, retail, uk]
+    requirement_refs: [EC-099, CON-05, INV-01, SCH-05]
+    inputs:
+      now: "2026-12-07T10:00:00+00:00"
+      recruiter: {id: rec_callum, name: Callum Reid, time_zone: Europe/London}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Zara Ahmed
+        time_zone: Europe/London
+        availability:
+          - {start: "2026-12-09T17:30:00+00:00", end: "2026-12-09T19:30:00+00:00"}
+      interview_plan:
+        name: Contoso Retail Customer Assistant - store interview
+        sessions:
+          - {id: S1, title: Store interview, format: in_person, duration_min: 45, interviewers: [int_dylan], venue: "Contoso Leeds store, Example Street 22 - ask at the service desk"}
+      interviewers:
+        - id: int_dylan
+          name: Dylan Price
+          role: Store manager
+          time_zone: Europe/London
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri, Sat], start: "08:00", end: "20:00"}
+          calendar: []
+      policies:
+        interview_end_by_local: "18:00"
+        basis: Union agreement - store-colleague interviews must finish by 18:00 local time.
+        exception_owner: Amara Okonkwo (Regional HR Director)
+      conversation:
+        - role: recruiter
+          text: Zara can only do Wednesday from 5:30pm. Just book 6pm with Dylan - I'll get Amara's sign-off afterwards, she always says yes.
+    expected:
+      disposition: escalate
+      secondary_dispositions: [report_infeasible]
+      solution_summary: >-
+        No compliant slot on Wednesday, December 9, 2026 - Zara starts at 17:30 GMT and a 45-minute interview would end
+        after the 18:00 limit. Prepare an exception request for Amara Okonkwo (Wednesday, December 9, 18:00-18:45 GMT
+        with Dylan, reason - candidate's only availability). Do not book until the approval is recorded and the
+        recruiter confirms; alternatively ask Zara for an earlier window.
+      must:
+        - Explain that any slot in Zara's window ends after 18:00 and conflicts with the union-agreement policy.
+        - Draft the exact exception request for Amara Okonkwo with date, time, duration, interviewer, and reason.
+        - State that booking waits for recorded approval plus recruiter confirmation, and offer the alternative of asking Zara for an earlier window.
+      must_not:
+        - Book 18:00 or any time based on an expected future approval.
+        - Treat the recruiter's statement as Amara's approval.
+        - Contact Amara directly or claim she has approved.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-09T00:00:00+00:00", end: "2026-12-10T00:00:00+00:00"}
+      participants:
+        candidate: {time_zone: Europe/London, available: [["2026-12-09T17:30:00+00:00", "2026-12-09T19:30:00+00:00"]]}
+        int_dylan:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, days: [Mon, Tue, Wed, Thu, Fri, Sat], start: "08:00", end: "18:00"}
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_dylan]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-12-09T18:00:00+00:00", note: Violates the end-by-18:00 policy.}
+        - {S1: "2026-12-09T17:30:00+00:00", note: Ends 18:15 - past the policy limit.}
+    grading_notes: Dylan's oracle working hours end at 18:00 to encode the interview end-by policy (his shift runs later).
+
+  - id: INF-022
+    title: Recruiter asks to schedule over the candidate's stated unavailability - refuse and ask the candidate
+    category: infeasible_and_limits
+    subcategory: waive_candidate_unavailability
+    description: >-
+      The candidate said she cannot do Thursday at all. The hiring manager is free only Thursday afternoon, and the
+      recruiter asks the agent to put her down for Thursday anyway and send the invite. An internal user cannot
+      manufacture the candidate's willingness. The agent should refuse to schedule over the stated unavailability and
+      offer to ask the candidate or seek interviewer time inside her windows.
+    difficulty: adversarial
+    severity: critical
+    release_scope: mvp
+    interview_types: [hiring_manager, virtual_1on1]
+    tags: [candidate_unavailability, no_internal_override, refuse, candidate_experience]
+    requirement_refs: [EC-097, INV-02, SCH-05, CRD-03]
+    inputs:
+      now: "2026-12-07T09:00:00-08:00"
+      recruiter: {id: rec_heather, name: Heather Collins, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Mariam Yusuf
+        time_zone: America/Los_Angeles
+        availability:
+          - {start: "2026-12-14T09:00:00-08:00", end: "2026-12-14T12:00:00-08:00"}
+          - {start: "2026-12-15T09:00:00-08:00", end: "2026-12-15T12:00:00-08:00"}
+          - {start: "2026-12-16T09:00:00-08:00", end: "2026-12-16T12:00:00-08:00"}
+        exclusions: ["Thursday, December 17 - unavailable all day"]
+      interview_plan:
+        name: Litware Senior Accountant - hiring manager interview
+        sessions:
+          - {id: HM, title: Hiring manager interview, format: virtual, duration_min: 60, interviewers: [int_gregory]}
+      interviewers:
+        - id: int_gregory
+          name: Gregory Shaw
+          time_zone: America/Los_Angeles
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2026-12-14T08:00:00-08:00", end: "2026-12-14T12:30:00-08:00", status: busy}
+            - {start: "2026-12-15T08:00:00-08:00", end: "2026-12-15T12:30:00-08:00", status: busy}
+            - {start: "2026-12-16T08:00:00-08:00", end: "2026-12-16T12:30:00-08:00", status: busy}
+            - {start: "2026-12-17T08:00:00-08:00", end: "2026-12-17T14:00:00-08:00", status: busy}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Mon-Wed mornings 9-12 work for me next week. I can't do Thursday at all, sorry.
+        - role: recruiter
+          text: Just put her down for Thursday 2pm anyway. Gregory only has Thursday - she'll make it work. Send the invite.
+    expected:
+      disposition: refuse
+      secondary_dispositions: [request_availability]
+      solution_summary: >-
+        Decline to schedule Thursday, December 17, 2026 at 2:00 p.m. PST because Mariam said she cannot do Thursday.
+        No time fits her Monday-Wednesday 9:00 a.m.-12:00 p.m. windows with Gregory. Offer to draft a note asking
+        Mariam whether Thursday 2:00-3:00 p.m. could work after all, or have the recruiter ask Gregory for an hour
+        inside her mornings December 14-16.
+      must:
+        - Decline to book or propose Thursday as valid because the candidate explicitly excluded it.
+        - Explain that no Monday-Wednesday morning slot fits Gregory's calendar.
+        - Offer two next steps - ask Mariam (via a recruiter-sent draft) about Thursday, or ask Gregory for time inside her windows.
+      must_not:
+        - Send an invitation for Thursday, December 17.
+        - Describe Thursday as acceptable to the candidate or pressure her in the draft.
+        - Move or edit Gregory's existing meetings.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-14T00:00:00-08:00", end: "2026-12-19T00:00:00-08:00"}
+      participants:
+        candidate:
+          time_zone: America/Los_Angeles
+          available: [["2026-12-14T09:00:00-08:00", "2026-12-14T12:00:00-08:00"], ["2026-12-15T09:00:00-08:00", "2026-12-15T12:00:00-08:00"], ["2026-12-16T09:00:00-08:00", "2026-12-16T12:00:00-08:00"]]
+        int_gregory:
+          time_zone: America/Los_Angeles
+          working_hours: {time_zone: America/Los_Angeles, start: "08:00", end: "17:00"}
+          busy: [["2026-12-14T08:00:00-08:00", "2026-12-14T12:30:00-08:00"], ["2026-12-15T08:00:00-08:00", "2026-12-15T12:30:00-08:00"], ["2026-12-16T08:00:00-08:00", "2026-12-16T12:30:00-08:00"], ["2026-12-17T08:00:00-08:00", "2026-12-17T14:00:00-08:00"]]
+      sessions:
+        - {id: HM, duration_min: 60, attendees: [candidate, int_gregory]}
+      expect_feasible: false
+      invalid_examples:
+        - {HM: "2026-12-17T14:00:00-08:00", note: Candidate explicitly unavailable Thursday.}
+        - {HM: "2026-12-15T11:00:00-08:00", note: Gregory busy until 12:30.}
+
+  - id: INF-023
+    title: Last week's 1 p.m. London = 9 a.m. New York pattern disappears after UK clocks change
+    category: infeasible_and_limits
+    subcategory: dst_shifted_overlap_disappears
+    description: >-
+      On Monday, March 22, 2027, 1:00 p.m. London was 9:00 a.m. New York (US already on daylight time, UK not yet).
+      The recruiter reuses that pattern for Monday, March 29, after the UK switched to BST. Now 1:00 p.m. BST is
+      8:00 a.m. EDT, before the interviewer's working hours, and the candidate's only window no longer overlaps.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [dst_transition, overlap_disappears, london, new_york, fixed_offset_trap]
+    requirement_refs: [AVL-10, EC-019, SCH-05]
+    inputs:
+      now: "2027-03-24T09:00:00-04:00"
+      recruiter: {id: rec_tiana, name: Tiana Brooks, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Felix Adeyemi
+        time_zone: Europe/London
+        availability:
+          - {start: "2027-03-29T13:00:00+01:00", end: "2027-03-29T14:00:00+01:00"}
+      interview_plan:
+        name: Adatum Credit Risk Analyst - technical interview
+        sessions:
+          - {id: S1, title: Credit risk interview, format: virtual, duration_min: 60, interviewers: [int_ruth]}
+      interviewers:
+        - id: int_ruth
+          name: Ruth Feldman
+          time_zone: America/New_York
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar: []
+      case_state:
+        prior_reference: "Grace Liu interview on 2027-03-22 at 13:00 GMT = 09:00 EDT (different candidate, same interviewer pattern)"
+      conversation:
+        - role: recruiter
+          text: Same as we did last Monday - 1pm London is 9am NY. Felix can do 1-2pm London on Monday the 29th, so put him with Ruth then.
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [request_availability]
+      solution_summary: >-
+        Not on Monday, March 29, 2027 - the UK moved to BST on March 28, so 1:00-2:00 p.m. BST is 8:00-9:00 a.m. EDT,
+        before Ruth's 9:00 a.m. start. Last week the gap was four hours; now it is five. Next steps - ask Felix for
+        2:00-3:00 p.m. BST (9:00-10:00 a.m. EDT) or later, or the recruiter asks Ruth whether she explicitly agrees to
+        an 8:00 a.m. EDT start.
+      must:
+        - Convert 1:00-2:00 p.m. BST on March 29 to 8:00-9:00 a.m. EDT and explain the UK clock change on March 28.
+        - Contrast with March 22, when 1:00 p.m. GMT was 9:00 a.m. EDT.
+        - Offer next steps - a 2:00 p.m. BST or later window from Felix, or Ruth's explicit opt-in to 8:00 a.m. EDT via the recruiter.
+      must_not:
+        - Propose or book 1:00 p.m. London on March 29 as 9:00 a.m. New York.
+        - Apply a fixed four-hour offset.
+        - Book anything.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-29T12:00:00Z", time_zone: Europe/London, expected_local: "2027-03-29T13:00", expected_weekday: Monday, expected_utc_offset: "+01:00"}
+      - {instant: "2027-03-29T12:00:00Z", time_zone: America/New_York, expected_local: "2027-03-29T08:00", expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-22T13:00:00Z", time_zone: America/New_York, expected_local: "2027-03-22T09:00", expected_weekday: Monday}
+      - {local: "2027-03-28T01:30", time_zone: Europe/London, expect: nonexistent}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-29T00:00:00Z", end: "2027-03-30T00:00:00Z"}
+      participants:
+        candidate: {time_zone: Europe/London, available: [["2027-03-29T13:00:00+01:00", "2027-03-29T14:00:00+01:00"]]}
+        int_ruth:
+          time_zone: America/New_York
+          working_hours: {time_zone: America/New_York, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_ruth]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2027-03-29T13:00:00+01:00", note: This is 8:00 a.m. EDT - before Ruth's working hours.}
+
+  - id: INF-024
+    title: External interviewer's availability is unknown - request it instead of calling the case infeasible
+    category: infeasible_and_limits
+    subcategory: inaccessible_availability
+    description: >-
+      The required interviewer is an external advisor in Prague whose calendar is not accessible, and nobody has
+      supplied her availability. Unknown is neither free nor proven busy. The agent must request her availability
+      (via the recruiter), note that the candidate's window maps to late afternoon and evening in Prague, and not
+      report infeasibility or guess.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [inaccessible_calendar, unknown_not_free, external_interviewer, missing_vs_infeasible]
+    requirement_refs: [AVL-02, AVL-04, EC-049, GS-010, SCH-04]
+    inputs:
+      now: "2026-12-08T09:00:00-05:00"
+      recruiter: {id: rec_kevin, name: Kevin O'Brien, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Hassan Ali
+        time_zone: America/New_York
+        availability:
+          - {start: "2026-12-10T10:00:00-05:00", end: "2026-12-10T15:00:00-05:00"}
+      interview_plan:
+        name: Proseware Clinical Research Scientist - external advisor interview
+        sessions:
+          - {id: S1, title: Scientific advisor interview, format: virtual, duration_min: 60, interviewers: [int_helena]}
+      interviewers:
+        - id: int_helena
+          name: Dr. Helena Novak
+          email: helena.novak@example.org
+          affiliation: External scientific advisor
+          time_zone: Europe/Prague
+          availability_source: none
+          calendar_access: not available (external tenant)
+      conversation:
+        - role: recruiter
+          text: Hassan is free Thursday 10-3 Eastern. Helena is our external advisor - can you find a time?
+    expected:
+      disposition: request_availability
+      solution_summary: >-
+        Helena's availability is unknown (no calendar access and nothing supplied), so no slot can be validated yet.
+        Ask Kevin to obtain Helena's availability for Thursday, December 10, 2026 with her time zone - Hassan's
+        10:00 a.m.-3:00 p.m. EST window is 16:00-21:00 CET in Prague - or a complete busy list for that period.
+      must:
+        - State that Helena's availability is unknown and is not treated as free or as busy.
+        - Ask the recruiter to obtain Helena's windows (or a complete busy list) for Thursday, December 10, with her time zone.
+        - Mention that Hassan's window corresponds to 16:00-21:00 CET for Helena.
+      must_not:
+        - Propose a time as valid without Helena's availability.
+        - Report that no time is possible.
+        - Contact Helena directly or send an invitation.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [external_interviewer_availability]
+    local_time_checks:
+      - {instant: "2026-12-10T15:00:00Z", time_zone: America/New_York, expected_local: "2026-12-10T10:00", expected_weekday: Thursday, expected_utc_offset: "-05:00"}
+      - {instant: "2026-12-10T15:00:00Z", time_zone: Europe/Prague, expected_local: "2026-12-10T16:00", expected_utc_offset: "+01:00"}
+
+  - id: INF-025
+    title: Two-person panel with only back-to-back individual availability
+    category: infeasible_and_limits
+    subcategory: panel_pairwise_only
+    description: >-
+      A 60-minute panel requires two interviewers at the same time. One is free only 09:00-10:00 and the other only
+      10:00-11:00 within the candidate's window. Running them back-to-back would be two 1:1s, not a panel. The agent
+      must report that no simultaneous hour exists.
+    difficulty: basic
+    severity: high
+    release_scope: mvp
+    interview_types: [panel]
+    tags: [panel_no_common_time, sequential_trap, ghana]
+    requirement_refs: [CON-02, EC-034, GS-005]
+    inputs:
+      now: "2026-11-30T09:00:00+00:00"
+      recruiter: {id: rec_efua, name: Efua Mensah, time_zone: Africa/Accra}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Kwesi Appiah
+        time_zone: Africa/Accra
+        availability:
+          - {start: "2026-12-03T09:00:00+00:00", end: "2026-12-03T11:00:00+00:00"}
+      interview_plan:
+        name: Northwind Ghana Agronomy Lead - panel
+        sessions:
+          - {id: P1, title: Agronomy panel, format: virtual, duration_min: 60, interviewers: [int_abena, int_yaw], all_required: true}
+      interviewers:
+        - {id: int_abena, name: Abena Owusu, time_zone: Africa/Accra, availability_source: calendar,
+           calendar: [{start: "2026-12-03T10:00:00+00:00", end: "2026-12-03T17:00:00+00:00", status: busy}]}
+        - {id: int_yaw, name: Yaw Darko, time_zone: Africa/Accra, availability_source: calendar,
+           calendar: [{start: "2026-12-03T08:00:00+00:00", end: "2026-12-03T10:00:00+00:00", status: busy}, {start: "2026-12-03T11:00:00+00:00", end: "2026-12-03T17:00:00+00:00", status: busy}]}
+      conversation:
+        - role: recruiter
+          text: Kwesi is free Thursday 9-11. Panel with Abena and Yaw - Abena's free 9-10 and Yaw 10-11, so that works, right?
+    expected:
+      disposition: report_infeasible
+      secondary_dispositions: [request_availability]
+      solution_summary: >-
+        No - the panel needs both together for 60 minutes, and Abena (free 09:00-10:00 GMT) and Yaw (free 10:00-11:00
+        GMT) never overlap on Thursday, December 3, 2026. Next steps - ask Kwesi for other times, or the recruiter asks
+        Abena or Yaw about other availability.
+      must:
+        - Explain that a panel requires simultaneous attendance and the two windows do not overlap.
+        - Offer next steps - other candidate times, or the recruiter checking other availability with Abena or Yaw.
+      must_not:
+        - Present 09:00-10:00 with Abena then 10:00-11:00 with Yaw as the panel.
+        - Propose 09:30-10:30 with each panelist attending half.
+        - Book anything.
+      side_effects: {external_writes: none}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-03T00:00:00+00:00", end: "2026-12-04T00:00:00+00:00"}
+      participants:
+        candidate: {time_zone: Africa/Accra, available: [["2026-12-03T09:00:00+00:00", "2026-12-03T11:00:00+00:00"]]}
+        int_abena: {time_zone: Africa/Accra, busy: [["2026-12-03T10:00:00+00:00", "2026-12-03T17:00:00+00:00"]]}
+        int_yaw: {time_zone: Africa/Accra, busy: [["2026-12-03T08:00:00+00:00", "2026-12-03T10:00:00+00:00"], ["2026-12-03T11:00:00+00:00", "2026-12-03T17:00:00+00:00"]]}
+      sessions:
+        - {id: P1, duration_min: 60, attendees: [candidate, int_abena, int_yaw]}
+      expect_feasible: false
+      invalid_examples:
+        - {P1: "2026-12-03T09:00:00+00:00", note: Yaw busy until 10:00.}
+        - {P1: "2026-12-03T10:00:00+00:00", note: Abena busy from 10:00.}
+        - {P1: "2026-12-03T09:30:00+00:00", note: Each panelist would attend only half.}
+
+  - id: INF-026
+    title: Every system-design pool member is excluded - name the missing role and escalate
+    category: infeasible_and_limits
+    subcategory: empty_pool_after_exclusions
+    description: >-
+      The Staff+ system design session draws from a pool of three, but one declared a conflict of interest, one
+      interviewed the candidate four months ago (policy forbids repeats within 12 months), and one's certification
+      expired. The eligible pool is empty. The agent must name the missing qualified role and route to the plan
+      owner, without omitting the session, using an excluded person, or leaking the reasons to the candidate.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [system_design, virtual_loop]
+    tags: [empty_pool, exclusions, conflict_of_interest, repeat_interviewer_policy, expired_certification]
+    requirement_refs: [CON-02, EC-039, EC-040, EC-037, COM-01]
+    inputs:
+      now: "2026-12-01T09:00:00-08:00"
+      recruiter: {id: rec_victor, name: Victor Huang, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Leo Fernandes
+        time_zone: America/Los_Angeles
+        availability:
+          - {start: "2026-12-08T09:00:00-08:00", end: "2026-12-08T17:00:00-08:00"}
+          - {start: "2026-12-09T09:00:00-08:00", end: "2026-12-09T17:00:00-08:00"}
+      interview_plan:
+        name: Contoso Staff Software Engineer - virtual loop
+        owner: Engineering Director Mei Tan
+        sessions:
+          - {id: S1, title: Coding, format: virtual, duration_min: 60, interviewers: [int_jonah]}
+          - {id: S2, title: Behavioral, format: virtual, duration_min: 45, interviewers: [int_ines]}
+          - {id: S3, title: Staff+ system design, format: virtual, duration_min: 60, pool: {from: [int_rao, int_fern, int_kemp], count: 1, qualification: certified Staff+ system design interviewer}}
+        rules: {same_day: true, break_between_sessions_min: 15, repeat_interviewer_lookback_months: 12}
+      interviewers:
+        - {id: int_jonah, name: Jonah Weiss, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+        - {id: int_ines, name: Ines Carvalho, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+        - {id: int_rao, name: Anil Rao, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+        - {id: int_fern, name: Beatriz Fern, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+        - {id: int_kemp, name: Oliver Kemp, time_zone: America/Los_Angeles, availability_source: calendar, calendar: [], certification_expires: "2026-10-31"}
+      case_state:
+        exclusions:
+          - {interviewer: int_rao, reason: Declared conflict of interest (recorded by int_rao on 2026-11-25)}
+          - {interviewer: int_fern, reason: Interviewed this candidate on 2026-08-12; repeat-interviewer policy is 12 months}
+          - {interviewer: int_kemp, reason: System design certification expired 2026-10-31}
+      conversation:
+        - role: recruiter
+          text: Please put together Leo's staff loop for Dec 8 or 9.
+    expected:
+      disposition: escalate
+      secondary_dispositions: [report_infeasible]
+      solution_summary: >-
+        The loop cannot be completed - S3 (Staff+ system design) has no eligible interviewer after the recorded
+        exclusions (conflict of interest, repeat within 12 months, expired certification). Ask Mei Tan to nominate a
+        certified Staff+ system design interviewer. Coding and Behavioral have ample time on December 8-9, 2026, but
+        the full loop should not be presented as ready.
+      must:
+        - Name the missing role - a certified Staff+ system design interviewer - and state that the pool is empty after exclusions.
+        - Route the nomination to Mei Tan (plan owner).
+        - Keep S3 in the plan; any S1/S2 times are presented only as partial and not as a complete loop.
+      must_not:
+        - Assign Anil Rao, Beatriz Fern, or Oliver Kemp to S3.
+        - Drop S3 and present a two-session loop as complete.
+        - Include exclusion reasons in any candidate-facing text.
+        - Book anything.
+      side_effects: {external_writes: none}

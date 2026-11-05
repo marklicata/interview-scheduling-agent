@@ -1,0 +1,1974 @@
+# Cross-timezone cases, part 2: odd offsets, date line, abbreviations, labels and offset formats.
+# All conversions computed with Python zoneinfo.
+test_cases:
+  - id: TZ-027
+    title: Kathmandu's +5:45 offset is not India time - a New York panel fits only at 8:15 p.m. Nepal time
+    category: cross_timezone
+    subcategory: quarter_hour_offset
+    description: >-
+      A Kathmandu candidate (UTC+5:45) is free 7:00-9:00 p.m. Nepal time; two New York panelists are needed for 45
+      minutes, and one is busy until 9:30 a.m. EST. The real window is 9:30-10:15 a.m. EST, so the only start is 9:30
+      a.m. EST = 8:15 p.m. NPT. Treating Nepal as India time (UTC+5:30) shifts everything by 15 minutes and makes a 9:45
+      a.m. EST start look valid when it actually ends at 9:15 p.m. NPT.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [panel]
+    tags: [nepal, quarter_hour_offset, new_york, india_time_confusion, exact_boundary]
+    requirement_refs: [AVL-10, SCH-01, SCH-08, EC-020]
+    inputs:
+      now: "2026-11-10T09:00:00-05:00"
+      recruiter: {id: rec_omar, name: Omar Haddad, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Sujata Shrestha
+        time_zone: Asia/Kathmandu
+        availability:
+          - {start: "2026-11-17T19:00:00+05:45", end: "2026-11-17T21:00:00+05:45"}
+      interview_plan:
+        name: Mobile Engineer - two-person panel
+        sessions:
+          - {id: P1, title: Mobile architecture panel, format: virtual, duration_min: 45, interviewers: [int_greg, int_annika], all_required: true}
+      interviewers:
+        - {id: int_greg, name: Greg Novak, time_zone: America/New_York, availability_source: calendar, working_hours: {start: "09:00", end: "17:00"}, calendar: []}
+        - id: int_annika
+          name: Annika Lund
+          time_zone: America/New_York
+          availability_source: calendar
+          working_hours: {start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-17T09:00:00-05:00", end: "2026-11-17T09:30:00-05:00", status: busy}
+      conversation:
+        - role: recruiter
+          text: >-
+            Sujata is free 7-9pm Nepal time on Tue Nov 17. Nepal is basically India time, 10.5 hrs ahead of us. Find a
+            45-min slot with Greg and Annika.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, November 17, 2026: only 9:30-10:15 a.m. EST = 8:15-9:00 p.m. NPT (UTC+5:45).
+      must:
+        - State that Nepal is UTC+5:45, 10 hours 45 minutes ahead of New York in November, not 10.5 hours.
+        - Propose only 9:30 a.m. EST = 8:15 p.m. NPT.
+        - Show the candidate's time with its quarter-hour offset.
+        - Ask whether to book.
+      must_not:
+        - Propose 9:45 a.m. EST (ends 9:15 p.m. NPT, after the candidate's window).
+        - Propose any start before 9:30 a.m. EST (Annika is busy).
+        - Round the candidate's time to a half-hour offset.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-17T14:30:00Z", time_zone: Asia/Kathmandu, expected_local: "2026-11-17T20:15", expected_weekday: Tuesday, expected_utc_offset: "+05:45"}
+      - {instant: "2026-11-17T14:30:00Z", time_zone: America/New_York, expected_local: "2026-11-17T09:30", expected_utc_offset: "-05:00"}
+      - {instant: "2026-11-17T14:30:00Z", time_zone: Asia/Kolkata, expected_local: "2026-11-17T20:00", expected_utc_offset: "+05:30"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-17T00:00:00-05:00", end: "2026-11-18T00:00:00-05:00"}
+      participants:
+        candidate: {time_zone: Asia/Kathmandu, available: [["2026-11-17T19:00:00+05:45", "2026-11-17T21:00:00+05:45"]]}
+        int_greg: {time_zone: America/New_York, working_hours: {time_zone: America/New_York, start: "09:00", end: "17:00"}}
+        int_annika:
+          time_zone: America/New_York
+          working_hours: {time_zone: America/New_York, start: "09:00", end: "17:00"}
+          busy: [["2026-11-17T09:00:00-05:00", "2026-11-17T09:30:00-05:00"]]
+      sessions:
+        - {id: P1, duration_min: 45, attendees: [candidate, int_greg, int_annika]}
+      expect_feasible: true
+      valid_examples:
+        - {P1: "2026-11-17T09:30:00-05:00"}
+      invalid_examples:
+        - {P1: "2026-11-17T09:45:00-05:00", note: "Ends 9:15 p.m. NPT."}
+        - {P1: "2026-11-17T09:00:00-05:00", note: Annika is busy.}
+      valid_start_bounds:
+        P1: {earliest: "2026-11-17T09:30:00-05:00", latest: "2026-11-17T09:30:00-05:00"}
+
+  - id: TZ-028
+    title: Dhaka, Kolkata and Kathmandu panel - three offsets 15 minutes apart and "BST" meaning Bangladesh time
+    category: cross_timezone
+    subcategory: south_asia_odd_offsets
+    description: >-
+      A Dhaka candidate writes "3-5 pm BST" (Bangladesh Standard Time, UTC+6; context: Dhaka address, +880 phone). Panelists
+      are in Kolkata (UTC+5:30, busy until 3:00 p.m. IST) and Kathmandu (UTC+5:45, leaves at 4:00 p.m. NPT). The 45-minute
+      panel fits exactly once: 3:30 p.m. Dhaka = 3:00 p.m. IST = 3:15 p.m. NPT. The agent should not read BST as British
+      Summer Time and should label the candidate time unambiguously.
+    difficulty: advanced
+    severity: medium
+    release_scope: mvp
+    interview_types: [panel]
+    tags: [bangladesh, nepal, india, quarter_hour_offset, bst_abbreviation, context_resolves_label]
+    requirement_refs: [AVL-10, SCH-01, EC-002, EC-020]
+    inputs:
+      now: "2026-11-24T10:00:00+05:30"
+      recruiter: {id: rec_kavya, name: Kavya Iyer, time_zone: Asia/Kolkata}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Tanvir Hossain
+        time_zone: Asia/Dhaka
+        time_zone_raw: BST
+        location: Dhaka, Bangladesh (phone +880)
+        availability:
+          - {start: "2026-12-01T15:00:00+06:00", end: "2026-12-01T17:00:00+06:00"}
+      interview_plan:
+        name: Microfinance Product Analyst - regional panel
+        sessions:
+          - {id: P1, title: Regional product panel, format: virtual, duration_min: 45, interviewers: [int_meera, int_bikash], all_required: true}
+      interviewers:
+        - id: int_meera
+          name: Meera Joshi
+          time_zone: Asia/Kolkata
+          availability_source: calendar
+          working_hours: {start: "09:30", end: "18:00"}
+          calendar:
+            - {start: "2026-12-01T14:30:00+05:30", end: "2026-12-01T15:00:00+05:30", status: busy}
+        - id: int_bikash
+          name: Bikash Gurung
+          time_zone: Asia/Kathmandu
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2026-12-01T10:00:00+05:45", end: "2026-12-01T16:00:00+05:45"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Tuesday 1 December I am free 3-5 pm BST. Regards, Tanvir (Dhaka)
+        - role: recruiter
+          text: Please find a 45-min slot for Tanvir with Meera and Bikash.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, December 1, 2026: only 3:30-4:15 p.m. Dhaka time (UTC+6) = 3:00-3:45 p.m. IST = 3:15-4:00 p.m. NPT.
+      must:
+        - Interpret "BST" as Bangladesh Standard Time (UTC+6) because the candidate is in Dhaka, and label it as Dhaka time in the output.
+        - Propose only the 3:30 p.m. Dhaka start, with IST and NPT equivalents.
+        - Explain that Meera is busy until 3:00 p.m. IST (3:30 p.m. Dhaka) and Bikash leaves at 4:00 p.m. NPT (4:15 p.m. Dhaka).
+        - Ask whether to book.
+      must_not:
+        - Interpret BST as British Summer Time.
+        - Propose 3:00 p.m. or 3:45 p.m. Dhaka time.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-12-01T09:30:00Z", time_zone: Asia/Dhaka, expected_local: "2026-12-01T15:30", expected_weekday: Tuesday, expected_utc_offset: "+06:00"}
+      - {instant: "2026-12-01T09:30:00Z", time_zone: Asia/Kolkata, expected_local: "2026-12-01T15:00", expected_utc_offset: "+05:30"}
+      - {instant: "2026-12-01T09:30:00Z", time_zone: Asia/Kathmandu, expected_local: "2026-12-01T15:15", expected_utc_offset: "+05:45"}
+      - {instant: "2026-12-01T10:15:00Z", time_zone: Asia/Kathmandu, expected_local: "2026-12-01T16:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-01T00:00:00+06:00", end: "2026-12-02T00:00:00+06:00"}
+      participants:
+        candidate: {time_zone: Asia/Dhaka, available: [["2026-12-01T15:00:00+06:00", "2026-12-01T17:00:00+06:00"]]}
+        int_meera:
+          time_zone: Asia/Kolkata
+          working_hours: {time_zone: Asia/Kolkata, start: "09:30", end: "18:00"}
+          busy: [["2026-12-01T14:30:00+05:30", "2026-12-01T15:00:00+05:30"]]
+        int_bikash: {time_zone: Asia/Kathmandu, available: [["2026-12-01T10:00:00+05:45", "2026-12-01T16:00:00+05:45"]]}
+      sessions:
+        - {id: P1, duration_min: 45, attendees: [candidate, int_meera, int_bikash]}
+      expect_feasible: true
+      valid_examples:
+        - {P1: "2026-12-01T15:30:00+06:00"}
+      invalid_examples:
+        - {P1: "2026-12-01T15:00:00+06:00", note: "Meera is busy until 3:00 p.m. IST."}
+        - {P1: "2026-12-01T15:45:00+06:00", note: "Ends 4:15 p.m. NPT, after Bikash leaves."}
+      valid_start_bounds:
+        P1: {earliest: "2026-12-01T15:30:00+06:00", latest: "2026-12-01T15:30:00+06:00"}
+
+  - id: TZ-029
+    title: Newfoundland's -3:30 offset with a Seattle interviewer - not Atlantic time
+    category: cross_timezone
+    subcategory: half_hour_offset
+    description: >-
+      A St. John's candidate is free 1:00-3:00 p.m. Newfoundland time (UTC-3:30). The Seattle interviewer starts at 9:00
+      a.m. PST, which is 1:30 p.m. NST. A 45-minute interview can start 9:00-9:45 a.m. PST (1:30-2:15 p.m. NST). Treating
+      Newfoundland as Atlantic time (UTC-4) shifts the window by 30 minutes and makes a 10:00 a.m. PST start look valid.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [newfoundland, half_hour_offset, seattle, atlantic_confusion]
+    requirement_refs: [AVL-10, SCH-01, EC-020]
+    inputs:
+      now: "2026-11-11T09:00:00-08:00"
+      recruiter: {id: rec_lucia, name: Lucia Ferreira, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Siobhan Walsh-Pittman
+        time_zone: America/St_Johns
+        availability:
+          - {start: "2026-11-18T13:00:00-03:30", end: "2026-11-18T15:00:00-03:30"}
+      interview_plan:
+        name: Offshore Logistics Coordinator - interview
+        sessions:
+          - {id: S1, title: Logistics interview, format: virtual, duration_min: 45, interviewers: [int_kenji]}
+      interviewers:
+        - {id: int_kenji, name: Kenji Harada, time_zone: America/Los_Angeles, availability_source: calendar, working_hours: {start: "09:00", end: "17:00"}, calendar: []}
+      conversation:
+        - role: recruiter
+          text: Siobhan's in St. John's, free 1-3pm her time Wed 11/18. That's Atlantic, so 4 hours ahead of us? Book-able with Kenji?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Wednesday, November 18, 2026: start 9:00-9:45 a.m. PST = 1:30-2:15 p.m. NST (UTC-3:30).
+      must:
+        - Explain that Newfoundland is UTC-3:30, 4.5 hours ahead of Seattle in November (not Atlantic time).
+        - Propose only starts from 9:00 to 9:45 a.m. PST (1:30-2:15 p.m. NST).
+        - Ask whether to book.
+      must_not:
+        - Propose 10:00 a.m. PST (ends 3:15 p.m. NST).
+        - Propose 8:30 a.m. PST (before Kenji's day).
+        - Label the candidate's time as AST.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-18T17:00:00Z", time_zone: America/St_Johns, expected_local: "2026-11-18T13:30", expected_weekday: Wednesday, expected_utc_offset: "-03:30"}
+      - {instant: "2026-11-18T17:00:00Z", time_zone: America/Los_Angeles, expected_local: "2026-11-18T09:00", expected_utc_offset: "-08:00"}
+      - {instant: "2026-11-18T17:00:00Z", time_zone: America/Halifax, expected_local: "2026-11-18T13:00", expected_utc_offset: "-04:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-18T00:00:00-08:00", end: "2026-11-19T00:00:00-08:00"}
+      participants:
+        candidate: {time_zone: America/St_Johns, available: [["2026-11-18T13:00:00-03:30", "2026-11-18T15:00:00-03:30"]]}
+        int_kenji: {time_zone: America/Los_Angeles, working_hours: {time_zone: America/Los_Angeles, start: "09:00", end: "17:00"}}
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_kenji]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-18T09:00:00-08:00"}
+      invalid_examples:
+        - {S1: "2026-11-18T10:00:00-08:00", note: "Ends 3:15 p.m. NST."}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-18T09:00:00-08:00", latest: "2026-11-18T09:45:00-08:00"}
+
+  - id: TZ-030
+    title: Tehran candidate with a Saturday-Wednesday workweek and a New York interviewer
+    category: cross_timezone
+    subcategory: half_hour_offset_workweek
+    description: >-
+      A Tehran candidate (UTC+3:30, no DST) states her own availability: weekday evenings 5:00-8:00 p.m. Saturday-Wednesday
+      and Thursday 10:00 a.m.-8:00 p.m.; Friday is her weekend. The New York interviewer supplied Wednesday 10:30 a.m.-12:00
+      p.m. and Friday 9:00-10:00 a.m. EST. Only Wednesday 10:30 a.m. EST = 7:00 p.m. Tehran fits a 60-minute interview;
+      Friday 9:00 a.m. EST (5:30 p.m. Tehran) is her weekend and was not offered.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [iran, half_hour_offset, non_standard_workweek, new_york, candidate_stated_week]
+    requirement_refs: [AVL-10, AVL-12, SCH-01, EC-020, EC-026]
+    inputs:
+      now: "2026-12-02T09:00:00-05:00"
+      recruiter: {id: rec_brooke, name: Brooke Lansing, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Shirin Tavakoli
+        time_zone: Asia/Tehran
+        availability_note: Saturday-Wednesday 17:00-20:00 and Thursday 10:00-20:00 Tehran time; Friday off.
+        availability:
+          - {start: "2026-12-07T17:00:00+03:30", end: "2026-12-07T20:00:00+03:30"}
+          - {start: "2026-12-08T17:00:00+03:30", end: "2026-12-08T20:00:00+03:30"}
+          - {start: "2026-12-09T17:00:00+03:30", end: "2026-12-09T20:00:00+03:30"}
+          - {start: "2026-12-10T10:00:00+03:30", end: "2026-12-10T20:00:00+03:30"}
+      interview_plan:
+        name: Computational Linguist - research interview
+        sessions:
+          - {id: S1, title: Research interview, format: virtual, duration_min: 60, interviewers: [int_rachel]}
+      interviewers:
+        - id: int_rachel
+          name: Rachel Goldberg
+          time_zone: America/New_York
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2026-12-09T10:30:00-05:00", end: "2026-12-09T12:00:00-05:00"}
+            - {start: "2026-12-11T09:00:00-05:00", end: "2026-12-11T10:00:00-05:00"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: >-
+            My week runs Saturday to Wednesday, so I'm free 5-8pm Tehran time on those days and all day Thursday 10am-8pm.
+            Friday is my weekend.
+        - role: recruiter
+          text: Rachel gave Wed 12/9 10:30-12 and Fri 12/11 9-10 our time. Which works for Shirin?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Only Wednesday, December 9, 2026, 10:30-11:30 a.m. EST = 7:00-8:00 p.m. Tehran (UTC+3:30).
+      must:
+        - Propose only 10:30 a.m. EST on December 9 = 7:00 p.m. Tehran time.
+        - Explain that Friday, December 11 at 9:00 a.m. EST is 5:30 p.m. Friday in Tehran, the candidate's stated weekend.
+        - Show the Tehran time with its UTC+3:30 offset.
+        - Ask whether to book.
+      must_not:
+        - Propose Friday, December 11.
+        - Propose a Wednesday start after 10:30 a.m. EST (ends after 8:00 p.m. Tehran).
+        - Assume the candidate's weekend from memory instead of using her statement.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-12-09T15:30:00Z", time_zone: Asia/Tehran, expected_local: "2026-12-09T19:00", expected_weekday: Wednesday, expected_utc_offset: "+03:30"}
+      - {instant: "2026-12-09T15:30:00Z", time_zone: America/New_York, expected_local: "2026-12-09T10:30", expected_utc_offset: "-05:00"}
+      - {instant: "2026-12-11T14:00:00Z", time_zone: Asia/Tehran, expected_local: "2026-12-11T17:30", expected_weekday: Friday}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-07T00:00:00-05:00", end: "2026-12-12T00:00:00-05:00"}
+      participants:
+        candidate:
+          time_zone: Asia/Tehran
+          available: [["2026-12-07T17:00:00+03:30", "2026-12-07T20:00:00+03:30"], ["2026-12-08T17:00:00+03:30", "2026-12-08T20:00:00+03:30"], ["2026-12-09T17:00:00+03:30", "2026-12-09T20:00:00+03:30"], ["2026-12-10T10:00:00+03:30", "2026-12-10T20:00:00+03:30"]]
+        int_rachel:
+          time_zone: America/New_York
+          available: [["2026-12-09T10:30:00-05:00", "2026-12-09T12:00:00-05:00"], ["2026-12-11T09:00:00-05:00", "2026-12-11T10:00:00-05:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_rachel]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-12-09T10:30:00-05:00"}
+      invalid_examples:
+        - {S1: "2026-12-11T09:00:00-05:00", note: "Friday 5:30 p.m. Tehran, the candidate's weekend."}
+        - {S1: "2026-12-09T11:00:00-05:00", note: "Ends 8:30 p.m. Tehran."}
+      valid_start_bounds:
+        S1: {earliest: "2026-12-09T10:30:00-05:00", latest: "2026-12-09T10:30:00-05:00"}
+
+  - id: TZ-031
+    title: Chatham Islands (+13:45) candidate with an Auckland interviewer - a 45-minute offset
+    category: cross_timezone
+    subcategory: quarter_hour_offset
+    description: >-
+      The Chatham Islands are UTC+13:45 in January (45 minutes ahead of Auckland). The candidate is free 9:00-10:00 a.m.
+      Chatham time; the Auckland interviewer supplied 8:30-9:30 a.m. NZDT. The overlap is exactly 45 minutes, so the only
+      start is 8:30 a.m. NZDT = 9:15 a.m. Chatham time. Assuming the islands share Auckland's clock (or are one hour ahead)
+      yields a wrong slot.
+    difficulty: advanced
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [chatham_islands, quarter_hour_offset, auckland, exact_boundary]
+    requirement_refs: [AVL-10, SCH-01, SCH-08, EC-020]
+    inputs:
+      now: "2027-01-07T10:00:00+13:00"
+      recruiter: {id: rec_aroha, name: Aroha Ngata, time_zone: Pacific/Auckland}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Hemi Tuuta
+        time_zone: Pacific/Chatham
+        availability:
+          - {start: "2027-01-14T09:00:00+13:45", end: "2027-01-14T10:00:00+13:45"}
+      interview_plan:
+        name: Fisheries Compliance Officer - interview
+        sessions:
+          - {id: S1, title: Compliance interview, format: virtual, duration_min: 45, interviewers: [int_sione]}
+      interviewers:
+        - id: int_sione
+          name: Sione Latu
+          time_zone: Pacific/Auckland
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-01-14T08:30:00+13:00", end: "2027-01-14T09:30:00+13:00"}
+      conversation:
+        - role: recruiter
+          text: Hemi is on the Chathams, free 9-10am his time Thu 14 Jan. Sione can do 8:30-9:30 Auckland time. Does that overlap?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Thursday, January 14, 2027: only 8:30-9:15 a.m. NZDT = 9:15-10:00 a.m. Chatham time (UTC+13:45).
+      must:
+        - State that the Chatham Islands are 45 minutes ahead of Auckland in January 2027.
+        - Propose only 8:30 a.m. NZDT = 9:15 a.m. Chatham time.
+        - Ask whether to book.
+      must_not:
+        - Propose 9:00 a.m. NZDT (ends 10:30 a.m. Chatham time).
+        - Treat the islands as one hour ahead or on the same clock.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-01-13T19:30:00Z", time_zone: Pacific/Chatham, expected_local: "2027-01-14T09:15", expected_weekday: Thursday, expected_utc_offset: "+13:45"}
+      - {instant: "2027-01-13T19:30:00Z", time_zone: Pacific/Auckland, expected_local: "2027-01-14T08:30", expected_utc_offset: "+13:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-01-14T00:00:00+13:00", end: "2027-01-15T00:00:00+13:00"}
+      participants:
+        candidate: {time_zone: Pacific/Chatham, available: [["2027-01-14T09:00:00+13:45", "2027-01-14T10:00:00+13:45"]]}
+        int_sione: {time_zone: Pacific/Auckland, available: [["2027-01-14T08:30:00+13:00", "2027-01-14T09:30:00+13:00"]]}
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_sione]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-01-14T08:30:00+13:00"}
+      invalid_examples:
+        - {S1: "2027-01-14T09:00:00+13:00", note: "Ends 10:30 a.m. Chatham time."}
+      valid_start_bounds:
+        S1: {earliest: "2027-01-14T08:30:00+13:00", latest: "2027-01-14T08:30:00+13:00"}
+
+  - id: TZ-032
+    title: Adelaide candidate's Tuesday morning is the Los Angeles interviewer's Monday afternoon
+    category: cross_timezone
+    subcategory: half_hour_offset_date_line
+    description: >-
+      In February Adelaide is on ACDT (UTC+10:30), 18.5 hours ahead of Los Angeles. The candidate is free Tuesday,
+      February 9, 2027, 7:30-9:00 a.m. Adelaide time - which is Monday, February 8, 1:00-2:30 p.m. PST. The recruiter
+      proposes "Tuesday 1:30 pm our time", which is Wednesday morning in Adelaide. Valid 45-minute starts are Monday
+      1:30-1:45 p.m. PST (Tuesday 8:00-8:15 a.m. ACDT) because the interviewer is busy until 1:30 p.m.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [adelaide, half_hour_offset, date_line, los_angeles, cross_date]
+    requirement_refs: [AVL-10, SCH-01, EC-016, EC-020]
+    inputs:
+      now: "2027-02-01T09:00:00-08:00"
+      recruiter: {id: rec_dana, name: Dana Whitfield, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Pippa Lindqvist
+        time_zone: Australia/Adelaide
+        availability:
+          - {start: "2027-02-09T07:30:00+10:30", end: "2027-02-09T09:00:00+10:30"}
+      interview_plan:
+        name: Wine Supply Planner - interview
+        sessions:
+          - {id: S1, title: Planning interview, format: virtual, duration_min: 45, interviewers: [int_marco]}
+      interviewers:
+        - id: int_marco
+          name: Marco DeLuca
+          time_zone: America/Los_Angeles
+          availability_source: calendar
+          working_hours: {start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2027-02-08T13:00:00-08:00", end: "2027-02-08T13:30:00-08:00", status: busy}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Tuesday 9 Feb I can do 7:30 to 9am Adelaide time, before work.
+        - role: recruiter
+          text: Great - let's do Tuesday 1:30pm our time with Marco.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Monday, February 8, 2027, start 1:30-1:45 p.m. PST = Tuesday, February 9, 8:00-8:15 a.m. ACDT. Tuesday 1:30 p.m. PST
+        is Wednesday 8:00 a.m. in Adelaide and outside the candidate's availability.
+      must:
+        - Explain that the candidate's Tuesday morning is Monday afternoon in Los Angeles.
+        - Propose only Monday, February 8 starts from 1:30 to 1:45 p.m. PST, labelled with both local dates.
+        - Correct the recruiter's "Tuesday 1:30 pm" suggestion.
+        - Ask whether to book.
+      must_not:
+        - Propose Tuesday, February 9 at 1:30 p.m. PST.
+        - Propose 1:00 p.m. PST Monday (Marco is busy).
+        - Show the candidate's date as Monday.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-02-08T21:30:00Z", time_zone: America/Los_Angeles, expected_local: "2027-02-08T13:30", expected_weekday: Monday, expected_utc_offset: "-08:00"}
+      - {instant: "2027-02-08T21:30:00Z", time_zone: Australia/Adelaide, expected_local: "2027-02-09T08:00", expected_weekday: Tuesday, expected_utc_offset: "+10:30"}
+      - {instant: "2027-02-09T21:30:00Z", time_zone: Australia/Adelaide, expected_local: "2027-02-10T08:00", expected_weekday: Wednesday}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-02-08T00:00:00-08:00", end: "2027-02-10T00:00:00-08:00"}
+      participants:
+        candidate: {time_zone: Australia/Adelaide, available: [["2027-02-09T07:30:00+10:30", "2027-02-09T09:00:00+10:30"]]}
+        int_marco:
+          time_zone: America/Los_Angeles
+          working_hours: {time_zone: America/Los_Angeles, start: "08:00", end: "17:00"}
+          busy: [["2027-02-08T13:00:00-08:00", "2027-02-08T13:30:00-08:00"]]
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_marco]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-02-08T13:30:00-08:00"}
+      invalid_examples:
+        - {S1: "2027-02-09T13:30:00-08:00", note: "Wednesday 8:00 a.m. in Adelaide."}
+        - {S1: "2027-02-08T13:00:00-08:00", note: Marco is busy.}
+      valid_start_bounds:
+        S1: {earliest: "2027-02-08T13:30:00-08:00", latest: "2027-02-08T13:45:00-08:00"}
+
+  - id: TZ-033
+    title: Adelaide, Darwin and Brisbane are three different clocks in January - "2pm Central" breaks Darwin
+    category: cross_timezone
+    subcategory: australia_summer_zones
+    description: >-
+      In January Adelaide is UTC+10:30 (daylight time), Darwin UTC+9:30 (no DST) and Brisbane UTC+10 (no DST); the Perth
+      candidate is UTC+8. The recruiter assumes Adelaide and Darwin are both "Central" and suggests 2 p.m. Central. With the
+      Adelaide panelist busy until 2:00 p.m. ACDT and the Darwin panelist leaving at 2:30 p.m. ACST, a 60-minute panel can
+      start only 03:30-04:00 UTC (11:30 a.m.-12:00 p.m. AWST).
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [panel]
+    tags: [adelaide, darwin, brisbane, perth, half_hour_offset, central_label_confusion, four_zones]
+    requirement_refs: [AVL-10, CON-11, SCH-01, EC-020]
+    inputs:
+      now: "2027-01-13T09:00:00+10:30"
+      recruiter: {id: rec_jess, name: Jess Papadopoulos, time_zone: Australia/Adelaide}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Liam Oyelaran
+        time_zone: Australia/Perth
+        availability:
+          - {start: "2027-01-20T10:00:00+08:00", end: "2027-01-20T13:00:00+08:00"}
+      interview_plan:
+        name: Mine Planning Engineer - panel
+        sessions:
+          - {id: P1, title: Technical panel, format: virtual, duration_min: 60, interviewers: [int_bronwyn, int_jarrah, int_sunita], all_required: true}
+      interviewers:
+        - id: int_bronwyn
+          name: Bronwyn Hale
+          time_zone: Australia/Adelaide
+          availability_source: calendar
+          working_hours: {start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2027-01-20T09:00:00+10:30", end: "2027-01-20T14:00:00+10:30", status: busy}
+        - id: int_jarrah
+          name: Jarrah Williams
+          time_zone: Australia/Darwin
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-01-20T09:00:00+09:30", end: "2027-01-20T14:30:00+09:30"}
+        - {id: int_sunita, name: Sunita Rao, time_zone: Australia/Brisbane, availability_source: calendar, working_hours: {start: "09:00", end: "17:00"}, calendar: []}
+      conversation:
+        - role: recruiter
+          text: >-
+            Liam (Perth) is free 10am-1pm his time Wed 20 Jan. Bronwyn's free from 2pm, Jarrah till 2:30. Darwin and
+            Adelaide are both Central, so 2pm Central works for both - can you check Sunita too?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Wednesday, January 20, 2027: start 11:30 a.m.-12:00 p.m. AWST = 2:00-2:30 p.m. ACDT (Adelaide) = 1:00-1:30 p.m. ACST
+        (Darwin) = 1:30-2:00 p.m. AEST (Brisbane).
+      must:
+        - Explain that in January Adelaide (UTC+10:30) is one hour ahead of Darwin (UTC+9:30), and Brisbane (UTC+10) sits between them.
+        - Show that 2:00 p.m. in Darwin would run to 3:00 p.m., past Jarrah's 2:30 p.m. limit.
+        - Propose starts only from 11:30 a.m. to 12:00 p.m. AWST, listing each panelist's local time.
+        - Ask whether to book.
+      must_not:
+        - Treat Adelaide and Darwin as the same clock in January.
+        - Propose any start that ends after 2:30 p.m. ACST or begins before 2:00 p.m. ACDT.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-01-20T03:30:00Z", time_zone: Australia/Adelaide, expected_local: "2027-01-20T14:00", expected_weekday: Wednesday, expected_utc_offset: "+10:30"}
+      - {instant: "2027-01-20T03:30:00Z", time_zone: Australia/Darwin, expected_local: "2027-01-20T13:00", expected_utc_offset: "+09:30"}
+      - {instant: "2027-01-20T03:30:00Z", time_zone: Australia/Brisbane, expected_local: "2027-01-20T13:30", expected_utc_offset: "+10:00"}
+      - {instant: "2027-01-20T03:30:00Z", time_zone: Australia/Perth, expected_local: "2027-01-20T11:30", expected_utc_offset: "+08:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-01-20T00:00:00+08:00", end: "2027-01-21T00:00:00+08:00"}
+      participants:
+        candidate: {time_zone: Australia/Perth, available: [["2027-01-20T10:00:00+08:00", "2027-01-20T13:00:00+08:00"]]}
+        int_bronwyn:
+          time_zone: Australia/Adelaide
+          working_hours: {time_zone: Australia/Adelaide, start: "09:00", end: "17:00"}
+          busy: [["2027-01-20T09:00:00+10:30", "2027-01-20T14:00:00+10:30"]]
+        int_jarrah: {time_zone: Australia/Darwin, available: [["2027-01-20T09:00:00+09:30", "2027-01-20T14:30:00+09:30"]]}
+        int_sunita: {time_zone: Australia/Brisbane, working_hours: {time_zone: Australia/Brisbane, start: "09:00", end: "17:00"}}
+      sessions:
+        - {id: P1, duration_min: 60, attendees: [candidate, int_bronwyn, int_jarrah, int_sunita]}
+      expect_feasible: true
+      valid_examples:
+        - {P1: "2027-01-20T11:30:00+08:00"}
+      invalid_examples:
+        - {P1: "2027-01-20T14:00:00+09:30", note: "2 p.m. Darwin ends 3 p.m., after Jarrah's 2:30 limit."}
+        - {P1: "2027-01-20T11:00:00+08:00", note: "1:30 p.m. ACDT, Bronwyn still busy."}
+      valid_start_bounds:
+        P1: {earliest: "2027-01-20T11:30:00+08:00", latest: "2027-01-20T12:00:00+08:00"}
+
+  - id: TZ-034
+    title: Across the date line, the LA candidate's Monday afternoon is the Auckland interviewer's Tuesday off
+    category: cross_timezone
+    subcategory: date_line
+    description: >-
+      The Auckland interviewer is out of office all day Tuesday, November 17, 2026 (NZ date). The recruiter in Los Angeles
+      sees "out Tuesday" and suggests the candidate's Monday afternoon - but Monday, November 16, 1:00-3:00 p.m. PST is
+      Tuesday 10:00 a.m.-12:00 p.m. NZDT. The candidate's Tuesday afternoon PST (Wednesday morning NZ) works instead.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [date_line, auckland, los_angeles, oof_local_day, cross_date]
+    requirement_refs: [AVL-10, AVL-03, SCH-01, EC-016, EC-022]
+    inputs:
+      now: "2026-11-10T09:00:00-08:00"
+      recruiter: {id: rec_lucia, name: Lucia Ferreira, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Tomas Herrera
+        time_zone: America/Los_Angeles
+        availability:
+          - {start: "2026-11-16T13:00:00-08:00", end: "2026-11-16T15:00:00-08:00"}
+          - {start: "2026-11-17T13:00:00-08:00", end: "2026-11-17T15:00:00-08:00"}
+      interview_plan:
+        name: Sustainability Analyst - interview with Auckland lead
+        sessions:
+          - {id: S1, title: Team lead interview, format: virtual, duration_min: 60, interviewers: [int_ngaio]}
+      interviewers:
+        - id: int_ngaio
+          name: Ngaio Parata
+          time_zone: Pacific/Auckland
+          availability_source: calendar
+          working_hours: {start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-17T00:00:00+13:00", end: "2026-11-18T00:00:00+13:00", status: oof, subject: Out of office}
+      conversation:
+        - role: recruiter
+          text: Ngaio's out Tuesday, so let's do Tomas on Monday afternoon (he's free 1-3 Mon and Tue).
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Monday afternoon PST is Ngaio's Tuesday (out of office). Use Tuesday, November 17, 2026, start 1:00-2:00 p.m. PST =
+        Wednesday, November 18, 10:00-11:00 a.m. NZDT.
+      must:
+        - Explain that Monday, November 16, 1:00-3:00 p.m. PST is Tuesday, November 17, 10:00 a.m.-12:00 p.m. in Auckland, when Ngaio is out.
+        - Propose Tuesday, November 17 starts from 1:00 to 2:00 p.m. PST, labelled as Wednesday, November 18 in Auckland.
+        - Ask whether to book.
+      must_not:
+        - Propose any Monday, November 16 PST time.
+        - Interpret Ngaio's out-of-office day in Pacific time.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-16T21:00:00Z", time_zone: Pacific/Auckland, expected_local: "2026-11-17T10:00", expected_weekday: Tuesday, expected_utc_offset: "+13:00"}
+      - {instant: "2026-11-17T21:00:00Z", time_zone: America/Los_Angeles, expected_local: "2026-11-17T13:00", expected_weekday: Tuesday}
+      - {instant: "2026-11-17T21:00:00Z", time_zone: Pacific/Auckland, expected_local: "2026-11-18T10:00", expected_weekday: Wednesday}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-16T00:00:00-08:00", end: "2026-11-18T00:00:00-08:00"}
+      participants:
+        candidate:
+          time_zone: America/Los_Angeles
+          available: [["2026-11-16T13:00:00-08:00", "2026-11-16T15:00:00-08:00"], ["2026-11-17T13:00:00-08:00", "2026-11-17T15:00:00-08:00"]]
+        int_ngaio:
+          time_zone: Pacific/Auckland
+          working_hours: {time_zone: Pacific/Auckland, start: "09:00", end: "17:00"}
+          busy: [["2026-11-17T00:00:00+13:00", "2026-11-18T00:00:00+13:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_ngaio]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-17T13:00:00-08:00"}
+      invalid_examples:
+        - {S1: "2026-11-16T13:00:00-08:00", note: Ngaio's Tuesday out-of-office day.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-17T13:00:00-08:00", latest: "2026-11-17T14:00:00-08:00"}
+
+  - id: TZ-035
+    title: Kiritimati and Honolulu read the same clock time but are a full day apart
+    category: cross_timezone
+    subcategory: date_line_same_clock
+    description: >-
+      Kiritimati (Line Islands, UTC+14) and Honolulu (UTC-10) show identical clock times on different dates. The candidate
+      offers "Tuesday and Wednesday 9-11 am" Kiritimati time; the Honolulu interviewer offers "Tuesday 9-11 am". The
+      recruiter says "both Tuesday 9-11 - easy". The candidate's Tuesday is the interviewer's Monday; the match is the
+      candidate's Wednesday, December 9 = the interviewer's Tuesday, December 8, 9:00-11:00 a.m.
+    difficulty: advanced
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [date_line, kiritimati, honolulu, same_clock_different_date, utc_plus_14]
+    requirement_refs: [AVL-10, SCH-01, EC-016]
+    inputs:
+      now: "2026-12-01T09:00:00-10:00"
+      recruiter: {id: rec_keoni, name: Keoni Kahale, time_zone: Pacific/Honolulu}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Teraaka Tebano
+        time_zone: Pacific/Kiritimati
+        availability:
+          - {start: "2026-12-08T09:00:00+14:00", end: "2026-12-08T11:00:00+14:00"}
+          - {start: "2026-12-09T09:00:00+14:00", end: "2026-12-09T11:00:00+14:00"}
+      interview_plan:
+        name: Climate Resilience Program Officer - interview
+        sessions:
+          - {id: S1, title: Program interview, format: virtual, duration_min: 60, interviewers: [int_malia]}
+      interviewers:
+        - id: int_malia
+          name: Malia Kealoha
+          time_zone: Pacific/Honolulu
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2026-12-08T09:00:00-10:00", end: "2026-12-08T11:00:00-10:00"}
+      conversation:
+        - role: recruiter
+          text: Teraaka's free Tue and Wed 9-11am his time, Malia's free Tue 9-11. Both Tuesday 9-11 - easy. Lock in Tuesday 9am.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Start between 9:00 and 10:00 a.m. HST on Tuesday, December 8, 2026 = 9:00-10:00 a.m. LINT on Wednesday, December 9.
+        The candidate's Tuesday 9:00 a.m. is Monday 9:00 a.m. in Honolulu.
+      must:
+        - Explain that Kiritimati is 24 hours ahead of Honolulu, so the same clock time falls on different dates.
+        - Propose starts from 9:00 to 10:00 a.m. HST Tuesday, December 8, labelled as Wednesday, December 9 for the candidate.
+        - Ask whether to book.
+      must_not:
+        - Propose the candidate's Tuesday, December 8 9:00 a.m. (Monday in Honolulu).
+        - Show a single shared date for both participants.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-12-08T19:00:00Z", time_zone: Pacific/Kiritimati, expected_local: "2026-12-09T09:00", expected_weekday: Wednesday, expected_utc_offset: "+14:00"}
+      - {instant: "2026-12-08T19:00:00Z", time_zone: Pacific/Honolulu, expected_local: "2026-12-08T09:00", expected_weekday: Tuesday, expected_utc_offset: "-10:00"}
+      - {instant: "2026-12-07T19:00:00Z", time_zone: Pacific/Honolulu, expected_local: "2026-12-07T09:00", expected_weekday: Monday}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-07T00:00:00-10:00", end: "2026-12-10T00:00:00-10:00"}
+      participants:
+        candidate:
+          time_zone: Pacific/Kiritimati
+          available: [["2026-12-08T09:00:00+14:00", "2026-12-08T11:00:00+14:00"], ["2026-12-09T09:00:00+14:00", "2026-12-09T11:00:00+14:00"]]
+        int_malia: {time_zone: Pacific/Honolulu, available: [["2026-12-08T09:00:00-10:00", "2026-12-08T11:00:00-10:00"]]}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_malia]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-12-08T09:00:00-10:00"}
+      invalid_examples:
+        - {S1: "2026-12-08T09:00:00+14:00", note: Monday 9:00 a.m. in Honolulu.}
+      valid_start_bounds:
+        S1: {earliest: "2026-12-08T09:00:00-10:00", latest: "2026-12-08T10:00:00-10:00"}
+
+  - id: TZ-036
+    title: '"9-11 CST" from a candidate with no location - China Standard or US Central?'
+    category: cross_timezone
+    subcategory: ambiguous_abbreviation
+    description: >-
+      A remote role is open to candidates in North America and APAC. The candidate's email says "Thursday Dec 3, 9-11
+      CST" and nothing about location; the ATS has no address. CST could be US Central (UTC-6) or China Standard Time
+      (UTC+8), 14 hours apart and on different US dates. The agent must ask, give both readings, and never infer the zone
+      from the candidate's name.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [phone_screen]
+    tags: [ambiguous_abbreviation, cst, china, us_central, no_name_inference]
+    requirement_refs: [INT-03, INT-05, EC-002]
+    inputs:
+      now: "2026-11-25T10:00:00-08:00"
+      recruiter: {id: rec_dana, name: Dana Whitfield, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Lin Zhao
+        time_zone_raw: CST
+        location: unknown (remote applicant)
+        availability_raw: Thursday Dec 3, 9-11 CST
+      interview_plan:
+        name: Developer Advocate (remote) - recruiter screen
+        sessions:
+          - {id: S1, title: Recruiter screen, format: phone, duration_min: 30, interviewers: [int_paige]}
+      interviewers:
+        - {id: int_paige, name: Paige Holloway, time_zone: America/Chicago, availability_source: calendar, working_hours: {start: "08:00", end: "17:00"}, calendar: []}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Hi! I could do Thursday Dec 3, 9-11 CST. Thanks, Lin
+        - role: recruiter
+          text: Paige is in Austin so CST is easy - set up Lin's screen.
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [which_cst, candidate_location_or_utc_offset]
+      solution_summary: >-
+        Ask whether CST means US Central (9-11 a.m. CST = 7-9 a.m. PST Thursday, December 3, 2026) or China Standard Time
+        (9-11 a.m. CST China = 7-9 p.m. Central on Wednesday, December 2). Do not assume either.
+      must:
+        - State that "CST" is ambiguous here (US Central Standard Time UTC-6 vs China Standard Time UTC+8).
+        - Give both readings with dates, noting the China reading is Wednesday evening, December 2 in Austin.
+        - Ask the recruiter to confirm the candidate's time zone or a UTC offset.
+      must_not:
+        - Infer the candidate's location or zone from the name.
+        - Propose or book a time based on either reading alone.
+        - Treat the recruiter's "CST is easy" as resolving the ambiguity.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-12-03T15:00:00Z", time_zone: America/Chicago, expected_local: "2026-12-03T09:00", expected_weekday: Thursday, expected_utc_offset: "-06:00"}
+      - {instant: "2026-12-03T01:00:00Z", time_zone: Asia/Shanghai, expected_local: "2026-12-03T09:00", expected_weekday: Thursday, expected_utc_offset: "+08:00"}
+      - {instant: "2026-12-03T01:00:00Z", time_zone: America/Chicago, expected_local: "2026-12-02T19:00", expected_weekday: Wednesday}
+
+  - id: TZ-037
+    title: '"CST" resolved by context - Chinese message says Beijing time, recruiter misreads it as Central'
+    category: cross_timezone
+    subcategory: abbreviation_resolved_by_context
+    description: >-
+      A Chengdu candidate writes in Chinese "北京时间 (CST) 12月8日 周二 上午9点到11点" - Beijing time, Tuesday December 8,
+      9-11 a.m. The Chicago recruiter thinks "that's our time". The context (explicit Beijing time, Chengdu address)
+      resolves the label to Asia/Shanghai, so the agent should proceed without a clarification round. The Tokyo
+      interviewer is busy 10:00-10:30 a.m. JST, so 60-minute starts are 10:30-11:00 a.m. JST = 9:30-10:00 a.m. Beijing.
+    difficulty: basic
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [cst, china, context_resolves_label, chinese_language, tokyo, avoid_overclarification]
+    requirement_refs: [INT-03, EC-002, AVL-10]
+    inputs:
+      now: "2026-12-01T09:00:00-06:00"
+      recruiter: {id: rec_grace, name: Grace Holloway, time_zone: America/Chicago}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Wang Jiayi
+        time_zone: Asia/Shanghai
+        time_zone_raw: 北京时间 (CST)
+        location: Chengdu, China
+        availability:
+          - {start: "2026-12-08T09:00:00+08:00", end: "2026-12-08T11:00:00+08:00"}
+      interview_plan:
+        name: Game Localization Producer - interview with Tokyo lead
+        sessions:
+          - {id: S1, title: Producer interview, format: virtual, duration_min: 60, interviewers: [int_haruto]}
+      interviewers:
+        - id: int_haruto
+          name: Haruto Saito
+          time_zone: Asia/Tokyo
+          availability_source: calendar
+          working_hours: {start: "09:30", end: "18:00"}
+          calendar:
+            - {start: "2026-12-08T10:00:00+09:00", end: "2026-12-08T10:30:00+09:00", status: busy}
+      conversation:
+        - role: candidate
+          channel: email
+          text: "您好，我北京时间 (CST) 12月8日 周二 上午9点到11点有空。谢谢！"
+        - role: recruiter
+          text: Jiayi says Tue Dec 8 9-11 CST - that's our time, right? Find something with Haruto.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, December 8, 2026: start 10:30-11:00 a.m. JST = 9:30-10:00 a.m. Beijing time (UTC+8) = Monday, December 7,
+        7:30-8:00 p.m. CST in Chicago.
+      must:
+        - Interpret the candidate's time as China Standard Time (Asia/Shanghai, UTC+8) because the message says Beijing time.
+        - Propose starts from 10:30 to 11:00 a.m. JST (9:30-10:00 a.m. Beijing time).
+        - Gently correct the recruiter that this is not US Central time and show the Chicago equivalent with its Monday date.
+        - Ask whether to book.
+      must_not:
+        - Treat the candidate's CST as US Central.
+        - Ask a redundant clarification about which CST.
+        - Propose 10:00 a.m. JST (Haruto is busy).
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-12-08T01:30:00Z", time_zone: Asia/Shanghai, expected_local: "2026-12-08T09:30", expected_weekday: Tuesday, expected_utc_offset: "+08:00"}
+      - {instant: "2026-12-08T01:30:00Z", time_zone: Asia/Tokyo, expected_local: "2026-12-08T10:30", expected_utc_offset: "+09:00"}
+      - {instant: "2026-12-08T01:30:00Z", time_zone: America/Chicago, expected_local: "2026-12-07T19:30", expected_weekday: Monday}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-08T00:00:00+08:00", end: "2026-12-09T00:00:00+08:00"}
+      participants:
+        candidate: {time_zone: Asia/Shanghai, available: [["2026-12-08T09:00:00+08:00", "2026-12-08T11:00:00+08:00"]]}
+        int_haruto:
+          time_zone: Asia/Tokyo
+          working_hours: {time_zone: Asia/Tokyo, start: "09:30", end: "18:00"}
+          busy: [["2026-12-08T10:00:00+09:00", "2026-12-08T10:30:00+09:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_haruto]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-12-08T10:30:00+09:00"}
+      invalid_examples:
+        - {S1: "2026-12-08T09:00:00-06:00", note: US Central reading - midnight in Tokyo.}
+        - {S1: "2026-12-08T10:00:00+09:00", note: Haruto is busy.}
+      valid_start_bounds:
+        S1: {earliest: "2026-12-08T10:30:00+09:00", latest: "2026-12-08T11:00:00+09:00"}
+
+  - id: TZ-038
+    title: '"11:00-13:00 IST" from a Dublin-based candidate to a Pune hiring team - India or Irish time?'
+    category: cross_timezone
+    subcategory: ambiguous_abbreviation
+    description: >-
+      The candidate's CV and address are in Dublin; the interviewers are in Pune. Her email says "Wed 13 Jan 11:00-13:00
+      IST". IST can mean India Standard Time (UTC+5:30) or Irish Standard Time (Ireland's summer clock; in January
+      Ireland is on GMT, which makes the label even less certain). The readings are 5.5 hours apart. The agent must ask.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [technical_coding]
+    tags: [ambiguous_abbreviation, ist, ireland, india, dublin, pune]
+    requirement_refs: [INT-03, INT-05, EC-002]
+    inputs:
+      now: "2027-01-06T10:00:00+05:30"
+      recruiter: {id: rec_aditya, name: Aditya Bhosale, time_zone: Asia/Kolkata}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Niamh Gallagher-Rao
+        time_zone_raw: IST
+        location: Dublin, Ireland (per CV)
+        availability_raw: Wed 13 Jan 11:00-13:00 IST
+      interview_plan:
+        name: Platform Engineer - coding round
+        sessions:
+          - {id: S1, title: Coding round, format: virtual, duration_min: 60, interviewers: [int_prasad]}
+      interviewers:
+        - {id: int_prasad, name: Prasad Kulkarni, time_zone: Asia/Kolkata, availability_source: calendar, working_hours: {start: "10:00", end: "19:00"}, calendar: []}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Happy to do Wed 13 Jan, 11:00-13:00 IST.
+        - role: recruiter
+          text: IST, perfect, same as us. Book her with Prasad at 11.
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [india_or_irish_time]
+      solution_summary: >-
+        Ask the candidate which zone she means. Dublin reading: 11:00-13:00 GMT = 4:30-6:30 p.m. India time. India reading:
+        11:00 a.m.-1:00 p.m. India time = 5:30-7:30 a.m. in Dublin. Both fit Prasad's day, so the difference matters.
+      must:
+        - Explain that IST is ambiguous for a Dublin-based candidate (India Standard Time UTC+5:30 vs Irish time, which is GMT in January).
+        - Give both readings for Wednesday, January 13, 2027 with times in both zones.
+        - Ask the recruiter to confirm with the candidate before proposing a booking.
+      must_not:
+        - Book 11:00 a.m. India time on the recruiter's assumption.
+        - Silently pick the Dublin reading either.
+        - Claim Ireland uses UTC+1 in January.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-01-13T11:00:00Z", time_zone: Europe/Dublin, expected_local: "2027-01-13T11:00", expected_weekday: Wednesday, expected_utc_offset: "+00:00"}
+      - {instant: "2027-01-13T11:00:00Z", time_zone: Asia/Kolkata, expected_local: "2027-01-13T16:30", expected_utc_offset: "+05:30"}
+      - {instant: "2027-01-13T05:30:00Z", time_zone: Europe/Dublin, expected_local: "2027-01-13T05:30"}
+
+  - id: TZ-039
+    title: '"Tuesday 2:00 pm EST" in April - literal EST or loosely Eastern daylight time?'
+    category: cross_timezone
+    subcategory: ambiguous_abbreviation
+    description: >-
+      A Philadelphia candidate offers a single slot "Tuesday April 13, 2:00 pm EST". In April the Eastern US is on EDT; many
+      people still write EST. Literally, 2:00 p.m. EST is 3:00 p.m. EDT. Both readings fit the Toronto interviewer's free
+      afternoon, so either guess could book the wrong hour. The agent must ask which hour is meant.
+    difficulty: basic
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [ambiguous_abbreviation, est_in_summer, philadelphia, toronto]
+    requirement_refs: [INT-03, INT-05, EC-002]
+    inputs:
+      now: "2027-04-07T10:00:00-04:00"
+      recruiter: {id: rec_noor, name: Noor Rahimi, time_zone: America/Toronto}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Marcus Oyelowo
+        time_zone: America/New_York
+        time_zone_raw: EST
+        availability_raw: Tuesday April 13, 2:00 pm EST (45 minutes)
+      interview_plan:
+        name: Actuarial Analyst - technical interview
+        sessions:
+          - {id: S1, title: Technical interview, format: virtual, duration_min: 45, interviewers: [int_claire]}
+      interviewers:
+        - {id: int_claire, name: Claire Fontaine, time_zone: America/Toronto, availability_source: calendar, working_hours: {start: "09:00", end: "17:00"}, calendar: []}
+      conversation:
+        - role: candidate
+          channel: email
+          text: I can only do one slot that week - Tuesday April 13 at 2:00 pm EST.
+        - role: recruiter
+          text: Claire is free all afternoon on the 13th. Set it up.
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [est_literal_or_local_eastern]
+      solution_summary: >-
+        Ask whether the candidate means 2:00 p.m. Eastern local time (EDT, 18:00 UTC) or literally 2:00 p.m. EST (UTC-5),
+        which is 3:00 p.m. EDT (19:00 UTC) on Tuesday, April 13, 2027. Both fit Claire's afternoon.
+      must:
+        - Explain that on April 13, 2027 the Eastern US is on EDT (UTC-4), so "2:00 pm EST" could mean 2:00 or 3:00 p.m. local.
+        - Give both readings as Eastern local times (Toronto and Philadelphia share the clock).
+        - Ask the recruiter to confirm the intended hour with the candidate.
+      must_not:
+        - Book or propose a single definitive time without clarification.
+        - Claim Toronto and Philadelphia are in different zones.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-04-13T18:00:00Z", time_zone: America/New_York, expected_local: "2027-04-13T14:00", expected_weekday: Tuesday, expected_utc_offset: "-04:00"}
+      - {instant: "2027-04-13T19:00:00Z", time_zone: America/Toronto, expected_local: "2027-04-13T15:00", expected_utc_offset: "-04:00"}
+
+  - id: TZ-040
+    title: London interviewer writes "9-10am GMT" in April; both readings suit the Dubai candidate
+    category: cross_timezone
+    subcategory: ambiguous_abbreviation
+    description: >-
+      On Tuesday, April 6, 2027 the UK is on BST (UTC+1). The London interviewer supplied "9-10am GMT" for a 60-minute
+      interview. Literally that is 13:00-14:00 in Dubai; if she meant UK clock time it is 12:00-13:00 in Dubai. The Dubai
+      candidate is free 12:00-14:00, so both are feasible and there is no robust slot - the agent must ask the
+      interviewer (through the recruiter) which hour she means.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1, hiring_manager]
+    tags: [ambiguous_abbreviation, gmt_in_bst, london, dubai, supplied_availability]
+    requirement_refs: [INT-03, INT-05, AVL-13, EC-002]
+    inputs:
+      now: "2027-03-31T10:00:00+04:00"
+      recruiter: {id: rec_layla, name: Layla Al-Mansoori, time_zone: Asia/Dubai}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Omar Shaikh
+        time_zone: Asia/Dubai
+        availability:
+          - {start: "2027-04-06T12:00:00+04:00", end: "2027-04-06T14:00:00+04:00"}
+      interview_plan:
+        name: Corporate Development Associate - hiring manager interview
+        sessions:
+          - {id: S1, title: Hiring manager interview, format: virtual, duration_min: 60, interviewers: [int_victoria]}
+      interviewers:
+        - {id: int_victoria, name: Victoria Ashworth, time_zone: Europe/London, time_zone_raw: GMT, availability_source: supplied,
+           supplied_availability_raw: "Tue 6 April 9-10am GMT"}
+      conversation:
+        - role: interviewer
+          channel: email
+          text: I can do Tue 6 April 9-10am GMT, nothing else that week.
+        - role: recruiter
+          text: Omar is free 12-2pm Dubai time on the 6th. Can we lock Victoria's hour?
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [gmt_literal_or_uk_local_time]
+      solution_summary: >-
+        Ask whether Victoria means 9-10 a.m. UK time (BST) = 12:00-1:00 p.m. Dubai, or literally 9-10 a.m. GMT = 10-11 a.m.
+        BST = 1:00-2:00 p.m. Dubai. Both fit Omar, so the recruiter must confirm with Victoria before booking.
+      must:
+        - Explain that the UK is on BST (UTC+1) on April 6, 2027, so "GMT" may be loose shorthand for UK time.
+        - Give both readings with Dubai times (12:00-1:00 p.m. or 1:00-2:00 p.m. GST).
+        - Ask the recruiter to confirm with Victoria which hour she meant.
+      must_not:
+        - Book either hour before clarification.
+        - Contact Victoria directly.
+        - State that London is on GMT on April 6, 2027.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-04-06T08:00:00Z", time_zone: Europe/London, expected_local: "2027-04-06T09:00", expected_weekday: Tuesday, expected_utc_offset: "+01:00"}
+      - {instant: "2027-04-06T08:00:00Z", time_zone: Asia/Dubai, expected_local: "2027-04-06T12:00", expected_utc_offset: "+04:00"}
+      - {instant: "2027-04-06T09:00:00Z", time_zone: Asia/Dubai, expected_local: "2027-04-06T13:00"}
+
+  - id: TZ-041
+    title: '"10am-12pm AEST" from Melbourne in January - propose the hour that is valid under either reading'
+    category: cross_timezone
+    subcategory: ambiguous_abbreviation_robust_slot
+    description: >-
+      A Melbourne candidate writes "Thu 21 Jan 10am-12pm AEST". In January Melbourne is on AEDT (UTC+11); AEST is UTC+10
+      (Brisbane's year-round time). Literal AEST = 11:00 a.m.-1:00 p.m. Melbourne; local reading = 9-11 a.m. Brisbane. The
+      Brisbane interviewer is free 9:00 a.m.-12:00 p.m. AEST. The intersection of both readings is 10:00-11:00 a.m. AEST
+      (11:00 a.m.-12:00 p.m. AEDT), which fits a 60-minute interview exactly. The agent can propose that robust slot while
+      asking the candidate to confirm the label.
+    difficulty: advanced
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [ambiguous_abbreviation, aest_in_summer, melbourne, brisbane, robust_slot]
+    requirement_refs: [INT-03, INT-05, EC-002, SCH-01]
+    inputs:
+      now: "2027-01-14T09:00:00+10:00"
+      recruiter: {id: rec_kirra, name: Kirra Simmons, time_zone: Australia/Brisbane}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Georgia Papadakis
+        time_zone: Australia/Melbourne
+        time_zone_raw: AEST
+        availability_raw: Thu 21 Jan 10am-12pm AEST
+        availability_robust_interpretation:
+          - {start: "2027-01-21T11:00:00+11:00", end: "2027-01-21T12:00:00+11:00"}
+      interview_plan:
+        name: Clinical Trials Coordinator - interview
+        sessions:
+          - {id: S1, title: Coordinator interview, format: virtual, duration_min: 60, interviewers: [int_dean]}
+      interviewers:
+        - id: int_dean
+          name: Dean Mackenzie
+          time_zone: Australia/Brisbane
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-01-21T09:00:00+10:00", end: "2027-01-21T12:00:00+10:00"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Thursday 21 Jan works, 10am-12pm AEST.
+        - role: recruiter
+          text: Dean's free 9-12 Brisbane time that day. Options?
+    expected:
+      disposition: propose_options
+      secondary_dispositions: [ask_clarification]
+      solution_summary: >-
+        Propose Thursday, January 21, 2027, 10:00-11:00 a.m. AEST (Brisbane) = 11:00 a.m.-12:00 p.m. AEDT (Melbourne), which
+        is inside the candidate's window under both readings; note the label and ask the candidate to confirm.
+      must:
+        - Point out that Melbourne is on AEDT (UTC+11) in January, so "AEST" is ambiguous.
+        - Propose only 10:00 a.m. AEST = 11:00 a.m. AEDT as the slot valid under both readings, showing both local times.
+        - Ask the candidate (via the recruiter) to confirm, and ask whether to book.
+      must_not:
+        - Propose 9:00 a.m. AEST (valid only under the local-time reading) or 11:00 a.m. AEST (valid only under the literal reading) as certain.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-01-21T00:00:00Z", time_zone: Australia/Brisbane, expected_local: "2027-01-21T10:00", expected_weekday: Thursday, expected_utc_offset: "+10:00"}
+      - {instant: "2027-01-21T00:00:00Z", time_zone: Australia/Melbourne, expected_local: "2027-01-21T11:00", expected_utc_offset: "+11:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-01-21T00:00:00+10:00", end: "2027-01-22T00:00:00+10:00"}
+      participants:
+        candidate: {time_zone: Australia/Melbourne, available: [["2027-01-21T11:00:00+11:00", "2027-01-21T12:00:00+11:00"]]}
+        int_dean: {time_zone: Australia/Brisbane, available: [["2027-01-21T09:00:00+10:00", "2027-01-21T12:00:00+10:00"]]}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_dean]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-01-21T10:00:00+10:00"}
+      invalid_examples:
+        - {S1: "2027-01-21T09:00:00+10:00", note: Valid only if AEST meant Melbourne local time.}
+        - {S1: "2027-01-21T11:00:00+10:00", note: Valid only under the literal AEST reading.}
+      valid_start_bounds:
+        S1: {earliest: "2027-01-21T10:00:00+10:00", latest: "2027-01-21T10:00:00+10:00"}
+    grading_notes: The oracle encodes only the intersection of both readings, which is what may be proposed without clarification.
+
+  - id: TZ-042
+    title: Generic "ET" and "PT" are not ambiguous - resolve to EDT/PDT and proceed without asking
+    category: cross_timezone
+    subcategory: generic_zone_labels
+    description: >-
+      A Boston candidate offers "1-3 pm ET" on Tuesday, March 16, 2027; the Seattle interviewer thinks in "PT". Generic
+      labels like ET/PT mean local Eastern/Pacific time and are unambiguous, so the agent should resolve them to EDT/PDT
+      for that date (after the March 14 change) and propose without a clarification round. The interviewer is busy until
+      10:30 a.m. PDT, so 60-minute starts are 1:30-2:00 p.m. EDT.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [generic_zone_label, et, pt, avoid_overclarification, us_dst_change]
+    requirement_refs: [INT-03, INT-05, AVL-10]
+    inputs:
+      now: "2027-03-09T09:00:00-08:00"
+      recruiter: {id: rec_lucia, name: Lucia Ferreira, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Priyanka Bose
+        time_zone: America/New_York
+        time_zone_raw: ET
+        availability:
+          - {start: "2027-03-16T13:00:00-04:00", end: "2027-03-16T15:00:00-04:00"}
+      interview_plan:
+        name: Account Executive - sales manager interview
+        sessions:
+          - {id: S1, title: Sales manager interview, format: virtual, duration_min: 60, interviewers: [int_cody]}
+      interviewers:
+        - id: int_cody
+          name: Cody Ramirez
+          time_zone: America/Los_Angeles
+          availability_source: calendar
+          working_hours: {start: "08:00", end: "17:00"}
+          calendar:
+            - {start: "2027-03-16T10:00:00-07:00", end: "2027-03-16T10:30:00-07:00", status: busy}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Tuesday 3/16 I'm open 1-3pm ET.
+        - role: recruiter
+          text: Find a slot with Cody (PT).
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, March 16, 2027: start 1:30-2:00 p.m. EDT = 10:30-11:00 a.m. PDT.
+      must:
+        - Resolve ET to EDT (UTC-4) and PT to PDT (UTC-7) for March 16, 2027.
+        - Propose only starts from 1:30 to 2:00 p.m. EDT (10:30-11:00 a.m. PDT).
+        - Ask whether to book.
+      must_not:
+        - Ask the recruiter or candidate to clarify what ET or PT means.
+        - Propose 1:00 p.m. EDT (Cody is busy until 10:30 a.m. PDT).
+        - Use standard-time offsets for March 16.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-16T17:30:00Z", time_zone: America/New_York, expected_local: "2027-03-16T13:30", expected_weekday: Tuesday, expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-16T17:30:00Z", time_zone: America/Los_Angeles, expected_local: "2027-03-16T10:30", expected_utc_offset: "-07:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-03-16T00:00:00-04:00", end: "2027-03-17T00:00:00-04:00"}
+      participants:
+        candidate: {time_zone: America/New_York, available: [["2027-03-16T13:00:00-04:00", "2027-03-16T15:00:00-04:00"]]}
+        int_cody:
+          time_zone: America/Los_Angeles
+          working_hours: {time_zone: America/Los_Angeles, start: "08:00", end: "17:00"}
+          busy: [["2027-03-16T10:00:00-07:00", "2027-03-16T10:30:00-07:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_cody]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-03-16T13:30:00-04:00"}
+      invalid_examples:
+        - {S1: "2027-03-16T13:00:00-04:00", note: Cody is busy.}
+      valid_start_bounds:
+        S1: {earliest: "2027-03-16T13:30:00-04:00", latest: "2027-03-16T14:00:00-04:00"}
+
+  - id: TZ-043
+    title: Candidate gives availability as "UTC+8" with no city - the offset is enough
+    category: cross_timezone
+    subcategory: explicit_utc_offset
+    description: >-
+      The candidate writes "Thu Dec 10, 09:00-11:00 (UTC+8)" without naming a city. A fixed offset fully determines the
+      instants, so the agent should not demand a city or guess one (Singapore, Perth, Manila...). The Sydney interviewer
+      (AEDT, UTC+11) is busy until 12:30 p.m., so 60-minute starts are 12:30-1:00 p.m. AEDT = 9:30-10:00 UTC+8.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [phone_screen]
+    tags: [explicit_utc_offset, sydney, avoid_overclarification, no_city_guess]
+    requirement_refs: [INT-03, INT-05, AVL-10]
+    inputs:
+      now: "2026-12-03T09:00:00+11:00"
+      recruiter: {id: rec_mia, name: Mia Kowalczyk, time_zone: Australia/Sydney}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Arif Rahman
+        time_zone: Etc/GMT-8
+        time_zone_raw: UTC+8
+        availability:
+          - {start: "2026-12-10T09:00:00+08:00", end: "2026-12-10T11:00:00+08:00"}
+      interview_plan:
+        name: Treasury Operations Analyst - phone screen
+        sessions:
+          - {id: S1, title: Phone screen, format: phone, duration_min: 60, interviewers: [int_olivia]}
+      interviewers:
+        - id: int_olivia
+          name: Olivia Brennan
+          time_zone: Australia/Sydney
+          availability_source: calendar
+          working_hours: {start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-12-10T12:00:00+11:00", end: "2026-12-10T12:30:00+11:00", status: busy}
+      conversation:
+        - role: candidate
+          channel: email
+          text: I'm available Thu Dec 10, 09:00-11:00 (UTC+8).
+        - role: recruiter
+          text: He didn't say which city. Can you still find a slot with Olivia?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Thursday, December 10, 2026: start 12:30-1:00 p.m. AEDT = 9:30-10:00 a.m. UTC+8.
+      must:
+        - Use the stated UTC+8 offset directly and show the candidate's time as UTC+8.
+        - Propose only starts from 12:30 to 1:00 p.m. AEDT (9:30-10:00 a.m. UTC+8).
+        - Ask whether to book (phone details will be needed for a phone screen).
+      must_not:
+        - Require the candidate's city before proposing.
+        - Label the candidate's time with a guessed city or zone name.
+        - Propose 12:00 p.m. AEDT (Olivia is busy).
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-12-10T01:30:00Z", time_zone: Australia/Sydney, expected_local: "2026-12-10T12:30", expected_weekday: Thursday, expected_utc_offset: "+11:00"}
+      - {instant: "2026-12-10T01:30:00Z", time_zone: Etc/GMT-8, expected_local: "2026-12-10T09:30", expected_utc_offset: "+08:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-10T00:00:00+08:00", end: "2026-12-11T00:00:00+08:00"}
+      participants:
+        candidate: {time_zone: Etc/GMT-8, available: [["2026-12-10T09:00:00+08:00", "2026-12-10T11:00:00+08:00"]]}
+        int_olivia:
+          time_zone: Australia/Sydney
+          working_hours: {time_zone: Australia/Sydney, start: "09:00", end: "17:00"}
+          busy: [["2026-12-10T12:00:00+11:00", "2026-12-10T12:30:00+11:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_olivia]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-12-10T09:30:00+08:00"}
+      invalid_examples:
+        - {S1: "2026-12-10T09:00:00+08:00", note: Olivia is busy.}
+      valid_start_bounds:
+        S1: {earliest: "2026-12-10T09:30:00+08:00", latest: "2026-12-10T10:00:00+08:00"}
+
+  - id: TZ-044
+    title: Candidate writes "UTC+11 (Sydney)" for a date after Sydney has returned to UTC+10
+    category: cross_timezone
+    subcategory: offset_label_conflict
+    description: >-
+      On Tuesday, April 6, 2027 Sydney is on AEST (UTC+10). The candidate, copying her March signature, writes "10:00-12:00
+      UTC+11 (Sydney)". The offset and the city disagree by an hour. With the Tokyo interviewer free 10:00-11:30 a.m. JST,
+      the Sydney-local reading allows 45-minute starts at 10:00-10:15 a.m. JST, while the literal UTC+11 reading has no
+      overlap at all. The agent must surface the conflict and ask, not silently pick one.
+    difficulty: adversarial
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [offset_label_conflict, sydney, tokyo, australia_dst_end, stale_signature]
+    requirement_refs: [INT-03, INT-05, EC-002, EC-019]
+    inputs:
+      now: "2027-03-30T09:00:00+09:00"
+      recruiter: {id: rec_yui, name: Yui Nakamura, time_zone: Asia/Tokyo}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Charlotte Nguyen-Baker
+        time_zone: Australia/Sydney
+        time_zone_raw: UTC+11 (Sydney)
+        availability_raw: Tue 6 Apr 10:00-12:00 UTC+11 (Sydney)
+      interview_plan:
+        name: Robotics Engineer - interview with Tokyo lead
+        sessions:
+          - {id: S1, title: Robotics interview, format: virtual, duration_min: 45, interviewers: [int_kaito]}
+      interviewers:
+        - id: int_kaito
+          name: Kaito Morishita
+          time_zone: Asia/Tokyo
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2027-04-06T10:00:00+09:00", end: "2027-04-06T11:30:00+09:00"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Tuesday 6 April works, 10:00-12:00 UTC+11 (Sydney).
+        - role: recruiter
+          text: Kaito has 10-11:30 Tokyo time that day. Please set it up.
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [offset_vs_city_conflict]
+      solution_summary: >-
+        Sydney is UTC+10 on April 6, 2027. If the candidate means Sydney time, 10:00-12:00 AEST = 9:00-11:00 a.m. JST and a
+        45-minute start at 11:00-11:15 a.m. AEST (10:00-10:15 a.m. JST) works. If she literally means UTC+11, her window is
+        8:00-10:00 a.m. JST and nothing fits. Ask which she means.
+      must:
+        - Point out that Sydney returns to UTC+10 on April 4, 2027, so "UTC+11 (Sydney)" is self-contradictory for April 6.
+        - Give both readings in JST and AEST and state which one would allow a slot.
+        - Ask the recruiter to confirm with the candidate before proposing or booking.
+      must_not:
+        - Silently use either the stated offset or the city.
+        - Book or send anything.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-04-06T00:00:00Z", time_zone: Australia/Sydney, expected_local: "2027-04-06T10:00", expected_weekday: Tuesday, expected_utc_offset: "+10:00"}
+      - {instant: "2027-04-06T00:00:00Z", time_zone: Asia/Tokyo, expected_local: "2027-04-06T09:00"}
+      - {instant: "2027-04-05T23:00:00Z", time_zone: Asia/Tokyo, expected_local: "2027-04-06T08:00"}
+      - {instant: "2027-04-06T01:00:00Z", time_zone: Australia/Sydney, expected_local: "2027-04-06T11:00"}
+
+  - id: TZ-045
+    title: Military-style Zulu times from a candidate in Germany for a Washington, DC interviewer
+    category: cross_timezone
+    subcategory: zulu_time_format
+    description: >-
+      A veteran candidate based near Kaiserslautern writes "Avail Wed 18 Nov: 1300Z-1600Z". Z means UTC, so the window is
+      8:00-11:00 a.m. EST and 2:00-5:00 p.m. CET. The DC interviewer is busy until 9:30 a.m. EST; 60-minute starts are
+      9:30-10:00 a.m. EST (1430Z-1500Z). The agent should parse Zulu correctly and present the candidate's time in Zulu and
+      local Germany time.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [zulu_time, utc, germany, washington_dc, military_format]
+    requirement_refs: [INT-03, AVL-10]
+    inputs:
+      now: "2026-11-11T09:00:00-05:00"
+      recruiter: {id: rec_brooke, name: Brooke Lansing, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Darnell Kowalczyk
+        time_zone: Europe/Berlin
+        location: Kaiserslautern area, Germany
+        availability:
+          - {start: "2026-11-18T13:00:00Z", end: "2026-11-18T16:00:00Z"}
+      interview_plan:
+        name: Defense Logistics Program Analyst - interview
+        sessions:
+          - {id: S1, title: Program interview, format: virtual, duration_min: 60, interviewers: [int_teresa]}
+      interviewers:
+        - id: int_teresa
+          name: Teresa Molina
+          time_zone: America/New_York
+          availability_source: calendar
+          working_hours: {start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-18T09:00:00-05:00", end: "2026-11-18T09:30:00-05:00", status: busy}
+      conversation:
+        - role: candidate
+          channel: email
+          text: "Avail Wed 18 Nov: 1300Z-1600Z. V/r, Darnell"
+        - role: recruiter
+          text: Can you decode that and find a slot with Teresa?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Wednesday, November 18, 2026: start 9:30-10:00 a.m. EST = 1430Z-1500Z = 3:30-4:00 p.m. CET.
+      must:
+        - Interpret 1300Z-1600Z as 13:00-16:00 UTC.
+        - Propose only starts from 9:30 to 10:00 a.m. EST, showing Zulu and the candidate's CET time.
+        - Ask whether to book.
+      must_not:
+        - Treat "1300" as local Germany or Eastern time.
+        - Propose 9:00 a.m. EST (Teresa is busy) or 10:30 a.m. EST (ends after 1600Z).
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-18T14:30:00Z", time_zone: America/New_York, expected_local: "2026-11-18T09:30", expected_weekday: Wednesday, expected_utc_offset: "-05:00"}
+      - {instant: "2026-11-18T14:30:00Z", time_zone: Europe/Berlin, expected_local: "2026-11-18T15:30", expected_utc_offset: "+01:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-18T00:00:00Z", end: "2026-11-19T00:00:00Z"}
+      participants:
+        candidate: {time_zone: Europe/Berlin, available: [["2026-11-18T13:00:00Z", "2026-11-18T16:00:00Z"]]}
+        int_teresa:
+          time_zone: America/New_York
+          working_hours: {time_zone: America/New_York, start: "09:00", end: "17:00"}
+          busy: [["2026-11-18T09:00:00-05:00", "2026-11-18T09:30:00-05:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_teresa]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-18T14:30:00Z"}
+      invalid_examples:
+        - {S1: "2026-11-18T15:30:00Z", note: Ends 1630Z.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-18T14:30:00Z", latest: "2026-11-18T15:00:00Z"}
+
+  - id: TZ-046
+    title: Candidate in Urumqi states "Beijing time" - do not reinterpret it through the profile's local zone
+    category: cross_timezone
+    subcategory: stated_reference_zone_differs_from_profile
+    description: >-
+      The candidate's profile zone is Asia/Urumqi (UTC+6), but she writes "北京时间 周四 12月3日 10:00-12:00" (Beijing time,
+      UTC+8), a common convention there. The stated reference zone wins over the profile zone. Read correctly, her window is
+      10:00-12:00 SGT for the Singapore interviewer (busy 12:00-13:00), giving 60-minute starts 10:00-11:00 a.m. SGT. Read
+      through the profile zone, the window would wrongly become 12:00-14:00 SGT.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [beijing_time, urumqi, profile_zone_conflict, singapore, chinese_language]
+    requirement_refs: [INT-03, INT-04, AVL-10]
+    inputs:
+      now: "2026-11-26T09:00:00+08:00"
+      recruiter: {id: rec_wen, name: Wen Hui Lim, time_zone: Asia/Singapore}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Gulnara Abdukerim
+        time_zone: Asia/Urumqi
+        time_zone_raw: 北京时间 (Beijing time)
+        availability:
+          - {start: "2026-12-03T08:00:00+06:00", end: "2026-12-03T10:00:00+06:00", stated_as: "10:00-12:00 Beijing time"}
+      interview_plan:
+        name: Agritech Data Analyst - interview
+        sessions:
+          - {id: S1, title: Analytics interview, format: virtual, duration_min: 60, interviewers: [int_darren]}
+      interviewers:
+        - id: int_darren
+          name: Darren Tan
+          time_zone: Asia/Singapore
+          availability_source: calendar
+          working_hours: {start: "09:00", end: "18:00"}
+          calendar:
+            - {start: "2026-12-03T12:00:00+08:00", end: "2026-12-03T13:00:00+08:00", status: busy}
+      conversation:
+        - role: candidate
+          channel: email
+          text: "我北京时间 周四 12月3日 10:00-12:00 可以。"
+        - role: recruiter
+          text: Her profile says Urumqi. Find a slot with Darren.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Thursday, December 3, 2026: start 10:00-11:00 a.m. SGT = 10:00-11:00 a.m. Beijing time (8:00-9:00 a.m. Urumqi local).
+      must:
+        - Interpret the window in Beijing time (UTC+8) because the candidate explicitly said so, regardless of the Urumqi profile zone.
+        - Propose only starts from 10:00 to 11:00 a.m. SGT.
+        - Present the candidate's time in Beijing time as she wrote it (optionally also UTC+6 local).
+        - Ask whether to book.
+      must_not:
+        - Reinterpret 10:00-12:00 as Urumqi local time (12:00-2:00 p.m. SGT).
+        - Propose 1:00 p.m. SGT.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-12-03T02:00:00Z", time_zone: Asia/Shanghai, expected_local: "2026-12-03T10:00", expected_weekday: Thursday, expected_utc_offset: "+08:00"}
+      - {instant: "2026-12-03T02:00:00Z", time_zone: Asia/Urumqi, expected_local: "2026-12-03T08:00", expected_utc_offset: "+06:00"}
+      - {instant: "2026-12-03T02:00:00Z", time_zone: Asia/Singapore, expected_local: "2026-12-03T10:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-12-03T00:00:00+08:00", end: "2026-12-04T00:00:00+08:00"}
+      participants:
+        candidate: {time_zone: Asia/Urumqi, available: [["2026-12-03T08:00:00+06:00", "2026-12-03T10:00:00+06:00"]]}
+        int_darren:
+          time_zone: Asia/Singapore
+          working_hours: {time_zone: Asia/Singapore, start: "09:00", end: "18:00"}
+          busy: [["2026-12-03T12:00:00+08:00", "2026-12-03T13:00:00+08:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_darren]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-12-03T10:00:00+08:00"}
+      invalid_examples:
+        - {S1: "2026-12-03T13:00:00+08:00", note: Profile-zone misreading; outside the Beijing-time window.}
+      valid_start_bounds:
+        S1: {earliest: "2026-12-03T10:00:00+08:00", latest: "2026-12-03T11:00:00+08:00"}
+
+  - id: TZ-047
+    title: A wrong "CET" label in April is resolved by the candidate's own London cross-reference
+    category: cross_timezone
+    subcategory: abbreviation_resolved_by_context
+    description: >-
+      A Lyon candidate writes in French "Mardi 13 avril : 10h00-12h00 CET (09h00-11h00 heure de Londres)". In April France
+      is on CEST, so "CET" is technically wrong, but the explicit London equivalent (9-11 BST) matches Paris local time and
+      resolves the label. The London interviewer is busy until 9:30 a.m. BST, so 60-minute starts are 9:30-10:00 a.m. BST
+      (10:30-11:00 a.m. Paris). Reading "CET" literally (UTC+1) would shift the window an hour later.
+    difficulty: intermediate
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [cet_label_in_summer, french_language, paris, london, context_resolves_label, avoid_overclarification]
+    requirement_refs: [INT-03, EC-002, AVL-10]
+    inputs:
+      now: "2027-04-06T09:00:00+01:00"
+      recruiter: {id: rec_harriet, name: Harriet Osei, time_zone: Europe/London}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Camille Bertrand
+        time_zone: Europe/Paris
+        time_zone_raw: CET
+        availability:
+          - {start: "2027-04-13T10:00:00+02:00", end: "2027-04-13T12:00:00+02:00"}
+      interview_plan:
+        name: Brand Partnerships Manager - interview
+        sessions:
+          - {id: S1, title: Partnerships interview, format: virtual, duration_min: 60, interviewers: [int_rory]}
+      interviewers:
+        - id: int_rory
+          name: Rory Pemberton
+          time_zone: Europe/London
+          availability_source: calendar
+          working_hours: {start: "09:00", end: "17:30"}
+          calendar:
+            - {start: "2027-04-13T09:00:00+01:00", end: "2027-04-13T09:30:00+01:00", status: busy}
+      conversation:
+        - role: candidate
+          channel: email
+          text: "Bonjour, je suis disponible mardi 13 avril : 10h00-12h00 CET (09h00-11h00 heure de Londres). Camille"
+        - role: recruiter
+          text: Find a slot with Rory.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Tuesday, April 13, 2027: start 9:30-10:00 a.m. BST = 10:30-11:00 a.m. CEST (Paris).
+      must:
+        - Use the candidate's London cross-reference to interpret the window as Paris local time (CEST, UTC+2).
+        - Propose only starts from 9:30 to 10:00 a.m. BST (10:30-11:00 a.m. Paris).
+        - Optionally note that France is on CEST in April, without blocking on it.
+        - Ask whether to book.
+      must_not:
+        - Read "CET" literally as UTC+1 and propose 10:30-11:00 a.m. BST starts.
+        - Ask an unnecessary clarification.
+        - Propose 9:00 a.m. BST (Rory is busy).
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-04-13T08:30:00Z", time_zone: Europe/Paris, expected_local: "2027-04-13T10:30", expected_weekday: Tuesday, expected_utc_offset: "+02:00"}
+      - {instant: "2027-04-13T08:30:00Z", time_zone: Europe/London, expected_local: "2027-04-13T09:30", expected_utc_offset: "+01:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2027-04-13T00:00:00+01:00", end: "2027-04-14T00:00:00+01:00"}
+      participants:
+        candidate: {time_zone: Europe/Paris, available: [["2027-04-13T10:00:00+02:00", "2027-04-13T12:00:00+02:00"]]}
+        int_rory:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, start: "09:00", end: "17:30"}
+          busy: [["2027-04-13T09:00:00+01:00", "2027-04-13T09:30:00+01:00"]]
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_rory]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2027-04-13T09:30:00+01:00"}
+      invalid_examples:
+        - {S1: "2027-04-13T10:30:00+01:00", note: "Literal-CET reading; ends 12:30 p.m. Paris."}
+      valid_start_bounds:
+        S1: {earliest: "2027-04-13T09:30:00+01:00", latest: "2027-04-13T10:00:00+01:00"}
+
+  - id: TZ-048
+    title: '"9-11 my time" from Window Rock, Arizona - a location where Arizona''s no-DST rule may not apply'
+    category: cross_timezone
+    subcategory: zone_inference_from_location
+    description: >-
+      The candidate lives in Window Rock, Arizona, in the Navajo Nation, which observes daylight saving time unlike most of
+      Arizona. She offers "Tue 3/16 9-11 am my time" for a 90-minute exercise with a Phoenix interviewer. If her clock is
+      Phoenix time the window is 9-11 a.m. MST; if it follows daylight time it is 8-10 a.m. MST. The overlap of both readings
+      is only 60 minutes, too short for 90, so the agent must confirm her clock instead of inferring "Arizona = no DST".
+    difficulty: advanced
+    severity: medium
+    release_scope: mvp
+    interview_types: [case_interview]
+    tags: [arizona, navajo_nation, zone_inference, location_to_zone, us_dst_change]
+    requirement_refs: [INT-03, INT-05, AVL-10]
+    inputs:
+      now: "2027-03-09T09:00:00-07:00"
+      recruiter: {id: rec_tyler, name: Tyler Brennan, time_zone: America/Phoenix}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Shandiin Begay
+        location: Window Rock, Arizona (Navajo Nation)
+        time_zone_raw: my time
+        availability_raw: Tue 3/16 9-11 am my time
+      interview_plan:
+        name: Water Resources Engineer - case exercise
+        sessions:
+          - {id: S1, title: Case exercise, format: virtual, duration_min: 90, interviewers: [int_hector]}
+      interviewers:
+        - {id: int_hector, name: Hector Villalobos, time_zone: America/Phoenix, availability_source: calendar, working_hours: {start: "08:00", end: "17:00"}, calendar: []}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Tuesday 3/16 I'm free 9-11am my time.
+        - role: recruiter
+          text: She's in Arizona so same as Hector. Book 9-10:30.
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [candidate_clock_dst_or_arizona_time]
+      solution_summary: >-
+        Ask whether the candidate's clock is on Arizona time (no DST: 9-11 a.m. MST, so 9:00-9:30 a.m. MST starts) or on
+        daylight time like the Navajo Nation (9-11 a.m. MDT = 8-10 a.m. MST, so 8:00-8:30 a.m. MST starts). No 90-minute start
+        works under both.
+      must:
+        - Explain that not all of Arizona skips daylight saving time and that the Navajo Nation follows it, so "my time" is uncertain on March 16, 2027.
+        - Give both readings in Phoenix time.
+        - Ask the recruiter to confirm the candidate's clock before booking.
+      must_not:
+        - Book 9:00-10:30 a.m. MST on the recruiter's assumption.
+        - Claim that every Arizona location is on MST all year.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-16T16:00:00Z", time_zone: America/Phoenix, expected_local: "2027-03-16T09:00", expected_weekday: Tuesday, expected_utc_offset: "-07:00"}
+      - {instant: "2027-03-16T15:00:00Z", time_zone: America/Denver, expected_local: "2027-03-16T09:00", expected_utc_offset: "-06:00"}
+      - {instant: "2027-03-16T15:00:00Z", time_zone: America/Phoenix, expected_local: "2027-03-16T08:00"}
+
+  - id: TZ-049
+    title: Exported availability says "1-3 pm ET" but its timestamps carry a stale -05:00 offset
+    category: cross_timezone
+    subcategory: label_offset_mismatch
+    description: >-
+      A third-party scheduling export for a New York interviewer labels her window "1-3 pm ET" on Tuesday, March 16, 2027,
+      but the machine timestamps carry -05:00 (standard time), which is 2-4 p.m. EDT. The London candidate is free
+      17:00-18:30 GMT. Under the label, 60-minute starts 17:00-17:30 GMT work; under the timestamps nothing fits. The agent
+      must notice the conflict between zone label and offset and ask, not silently trust either.
+    difficulty: adversarial
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [stale_offset, export_mismatch, new_york, london, mislabeled_offset]
+    requirement_refs: [AVL-13, AVL-15, INT-05, EC-019]
+    inputs:
+      now: "2027-03-10T09:00:00-05:00"
+      recruiter: {id: rec_omar, name: Omar Haddad, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Benedict Asante
+        time_zone: Europe/London
+        availability:
+          - {start: "2027-03-16T17:00:00+00:00", end: "2027-03-16T18:30:00+00:00"}
+      interview_plan:
+        name: Equity Research Associate - interview
+        sessions:
+          - {id: S1, title: Research interview, format: virtual, duration_min: 60, interviewers: [int_dana]}
+      interviewers:
+        - id: int_dana
+          name: Dana Kowalski
+          time_zone: America/New_York
+          availability_source: supplied
+          offset_check: false
+          supplied_availability_label: Tue 3/16 1-3 pm ET
+          supplied_availability:
+            - {start: "2027-03-16T13:00:00-05:00", end: "2027-03-16T15:00:00-05:00", source: scheduling-tool export}
+      conversation:
+        - role: recruiter
+          text: Dana's export says 1-3 ET on the 16th. Benedict is free 5-6:30pm London. Book something.
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [label_vs_timestamp_offset]
+      solution_summary: >-
+        The export conflicts: "1-3 pm ET" on March 16, 2027 is 17:00-19:00 UTC (EDT), but the timestamps (-05:00) mean
+        18:00-20:00 UTC. If the label is right, 60-minute starts 5:00-5:30 p.m. GMT (1:00-1:30 p.m. EDT) work; if the
+        timestamps are right, nothing fits Benedict's window. Ask the recruiter to confirm Dana's window.
+      must:
+        - Detect that -05:00 is not New York's offset on March 16, 2027 (EDT is -04:00).
+        - Explain both interpretations and their consequences for Benedict's 5:00-6:30 p.m. GMT window.
+        - Ask the recruiter to confirm Dana's actual window before proposing or booking.
+      must_not:
+        - Book or propose a time based on only one interpretation.
+        - Silently "fix" the offset without telling the recruiter.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2027-03-16T17:00:00Z", time_zone: America/New_York, expected_local: "2027-03-16T13:00", expected_weekday: Tuesday, expected_utc_offset: "-04:00"}
+      - {instant: "2027-03-16T18:00:00Z", time_zone: America/New_York, expected_local: "2027-03-16T14:00"}
+      - {instant: "2027-03-16T17:00:00Z", time_zone: Europe/London, expected_local: "2027-03-16T17:00", expected_utc_offset: "+00:00"}
+
+  - id: TZ-050
+    title: Recruiter typed the Lisbon candidate's zone-less times into the form as Eastern time
+    category: cross_timezone
+    subcategory: availability_in_wrong_zone
+    description: >-
+      The candidate (in Lisbon) emailed "Thursday 19th I'm free 9:30-11:30" with no zone. The New York recruiter entered it
+      in the structured form as 9:30-11:30 a.m. ET. The two sources disagree by five hours, and both readings fit the Madrid
+      interviewer (10:30 a.m.-12:30 p.m. CET vs 3:30-5:30 p.m. CET). The agent must reconcile visibly and ask rather than
+      trust the structured entry.
+    difficulty: adversarial
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [availability_in_recruiter_zone, provenance, lisbon, madrid, source_conflict]
+    requirement_refs: [INT-04, INT-06, AVL-15, EC-011]
+    inputs:
+      now: "2026-11-12T10:00:00-05:00"
+      recruiter: {id: rec_brooke, name: Brooke Lansing, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Inês Carvalho
+        time_zone: Europe/Lisbon
+        availability_raw: Thursday 19th I'm free 9:30-11:30 (no zone stated)
+      interview_plan:
+        name: Renewable Energy Analyst - interview
+        sessions:
+          - {id: S1, title: Analyst interview, format: virtual, duration_min: 60, interviewers: [int_alvaro]}
+      interviewers:
+        - id: int_alvaro
+          name: Alvaro Ruiz
+          time_zone: Europe/Madrid
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2026-11-19T10:00:00+01:00", end: "2026-11-19T13:00:00+01:00"}
+            - {start: "2026-11-19T15:00:00+01:00", end: "2026-11-19T18:00:00+01:00"}
+      case_state:
+        structured_entry:
+          entered_by: rec_brooke
+          time_zone: America/New_York
+          availability:
+            - {start: "2026-11-19T09:30:00-05:00", end: "2026-11-19T11:30:00-05:00"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: Thursday 19th I'm free 9:30-11:30. Best, Inês
+        - role: recruiter
+          text: I put Inês's Thursday availability in the form. Find a slot with Alvaro.
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [candidate_zone_for_availability]
+      solution_summary: >-
+        The email has no zone and the candidate is in Lisbon; the form says ET. Lisbon reading: 9:30-11:30 a.m. WET =
+        10:30 a.m.-12:30 p.m. CET (fits Alvaro's morning). ET reading: 9:30-11:30 a.m. EST = 2:30-4:30 p.m. Lisbon =
+        3:30-5:30 p.m. CET (fits Alvaro's afternoon). Ask the recruiter to confirm.
+      must:
+        - Point out the conflict between the candidate's zone-less email (candidate in Lisbon) and the form entry labelled ET.
+        - Show both readings with Lisbon, Madrid and New York times.
+        - Ask the recruiter to confirm which zone the candidate meant (most likely Lisbon local time).
+      must_not:
+        - Silently trust the structured ET entry.
+        - Propose or book a definitive time before the zone is confirmed.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-19T09:30:00Z", time_zone: Europe/Lisbon, expected_local: "2026-11-19T09:30", expected_weekday: Thursday, expected_utc_offset: "+00:00"}
+      - {instant: "2026-11-19T09:30:00Z", time_zone: Europe/Madrid, expected_local: "2026-11-19T10:30", expected_utc_offset: "+01:00"}
+      - {instant: "2026-11-19T14:30:00Z", time_zone: America/New_York, expected_local: "2026-11-19T09:30", expected_utc_offset: "-05:00"}
+      - {instant: "2026-11-19T14:30:00Z", time_zone: Europe/Madrid, expected_local: "2026-11-19T15:30"}
+
+  - id: TZ-051
+    title: Johannesburg candidate offers "7-9 am your time" to a Seattle recruiter for a London interviewer
+    category: cross_timezone
+    subcategory: availability_in_recipient_zone
+    description: >-
+      The candidate kindly converts for the recruiter: "I can do 7-9 am your time on Wed Nov 18" (Seattle). That is 15:00-17:00
+      UTC = 5:00-7:00 p.m. SAST. The London interviewer works until 5:30 p.m. GMT and is busy 3:00-3:30 p.m. GMT. 45-minute
+      starts run 7:30-8:15 a.m. PST (3:30-4:15 p.m. GMT, 5:30-6:15 p.m. SAST). Reading "your time" as the candidate's own zone
+      would produce a 7-9 a.m. SAST window that is before London's day.
+    difficulty: intermediate
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [your_time, johannesburg, london, seattle, three_zones]
+    requirement_refs: [INT-03, AVL-10, SCH-01]
+    inputs:
+      now: "2026-11-11T09:00:00-08:00"
+      recruiter: {id: rec_lucia, name: Lucia Ferreira, time_zone: America/Los_Angeles}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Lerato Dlamini
+        time_zone: Africa/Johannesburg
+        availability:
+          - {start: "2026-11-18T15:00:00Z", end: "2026-11-18T17:00:00Z", stated_as: "7-9 am your time (recruiter, Pacific)"}
+      interview_plan:
+        name: Mining Finance Analyst - interview
+        sessions:
+          - {id: S1, title: Finance interview, format: virtual, duration_min: 45, interviewers: [int_oliver]}
+      interviewers:
+        - id: int_oliver
+          name: Oliver Hartley
+          time_zone: Europe/London
+          availability_source: calendar
+          working_hours: {start: "09:00", end: "17:30"}
+          calendar:
+            - {start: "2026-11-18T15:00:00+00:00", end: "2026-11-18T15:30:00+00:00", status: busy}
+      conversation:
+        - role: candidate
+          channel: email
+          text: To make it easy for you, I can do 7-9 am your time on Wed Nov 18.
+        - role: recruiter
+          text: Lerato's in Joburg. Find a 45-min slot with Oliver in London.
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Wednesday, November 18, 2026: start 7:30-8:15 a.m. PST = 3:30-4:15 p.m. GMT = 5:30-6:15 p.m. SAST.
+      must:
+        - Interpret "your time" as the recruiter's Pacific time.
+        - Propose only starts from 7:30 to 8:15 a.m. PST, with GMT and SAST equivalents (candidate-facing in SAST).
+        - Ask whether to book.
+      must_not:
+        - Interpret 7-9 a.m. as Johannesburg time.
+        - Propose 7:00 a.m. PST (Oliver is busy) or any start after 8:15 a.m. PST.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-18T15:30:00Z", time_zone: America/Los_Angeles, expected_local: "2026-11-18T07:30", expected_weekday: Wednesday, expected_utc_offset: "-08:00"}
+      - {instant: "2026-11-18T15:30:00Z", time_zone: Africa/Johannesburg, expected_local: "2026-11-18T17:30", expected_utc_offset: "+02:00"}
+      - {instant: "2026-11-18T15:30:00Z", time_zone: Europe/London, expected_local: "2026-11-18T15:30", expected_utc_offset: "+00:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-18T00:00:00Z", end: "2026-11-19T00:00:00Z"}
+      participants:
+        candidate: {time_zone: Africa/Johannesburg, available: [["2026-11-18T15:00:00Z", "2026-11-18T17:00:00Z"]]}
+        int_oliver:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, start: "09:00", end: "17:30"}
+          busy: [["2026-11-18T15:00:00+00:00", "2026-11-18T15:30:00+00:00"]]
+      sessions:
+        - {id: S1, duration_min: 45, attendees: [candidate, int_oliver]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-18T07:30:00-08:00"}
+      invalid_examples:
+        - {S1: "2026-11-18T08:30:00-08:00", note: "Ends 9:15 a.m. PST, past the candidate's window."}
+        - {S1: "2026-11-18T07:00:00+02:00", note: Candidate-zone misreading; 5:00 a.m. GMT.}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-18T07:30:00-08:00", latest: "2026-11-18T08:15:00-08:00"}
+
+  - id: TZ-052
+    title: German 24-hour format with day-month date ("Mi., 18.11., 14:00-16:30 Uhr") for a Boston interviewer
+    category: cross_timezone
+    subcategory: date_and_clock_format
+    description: >-
+      A Munich candidate writes "Mi., 18.11., 14:00-16:30 Uhr" (Wednesday, November 18, 2-4:30 p.m. CET). The Boston
+      interviewer writes "free 8:30 to 10" that day. The agent must parse DD.MM and the 24-hour clock, convert 14:00-16:30
+      CET to 8:00-10:30 a.m. EST, and propose 60-minute starts 8:30-9:00 a.m. EST (2:30-3:00 p.m. CET).
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [24_hour_clock, day_month_date, german_language, munich, boston]
+    requirement_refs: [INT-03, AVL-10, EC-003]
+    inputs:
+      now: "2026-11-11T10:00:00-05:00"
+      recruiter: {id: rec_brooke, name: Brooke Lansing, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Johanna Weiß
+        time_zone: Europe/Berlin
+        availability:
+          - {start: "2026-11-18T14:00:00+01:00", end: "2026-11-18T16:30:00+01:00"}
+      interview_plan:
+        name: Battery Systems Engineer - technical interview
+        sessions:
+          - {id: S1, title: Technical interview, format: virtual, duration_min: 60, interviewers: [int_kevin]}
+      interviewers:
+        - id: int_kevin
+          name: Kevin O'Hara
+          time_zone: America/New_York
+          availability_source: supplied
+          supplied_availability:
+            - {start: "2026-11-18T08:30:00-05:00", end: "2026-11-18T10:00:00-05:00"}
+      conversation:
+        - role: candidate
+          channel: email
+          text: "Guten Tag, ich kann am Mi., 18.11., 14:00-16:30 Uhr. Viele Grüße, Johanna Weiß"
+        - role: interviewer
+          channel: teams
+          text: I'm free 8:30 to 10 on the 18th.
+        - role: recruiter
+          text: Can you line these up?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Wednesday, November 18, 2026: start 8:30-9:00 a.m. EST = 14:30-15:00 CET.
+      must:
+        - Parse 18.11. as November 18 and 14:00-16:30 as 2:00-4:30 p.m. Munich time (CET).
+        - Propose only starts from 8:30 to 9:00 a.m. EST, shown to the candidate in 24-hour CET (14:30-15:00).
+        - Ask whether to book.
+      must_not:
+        - Treat 18.11 as an invalid or month-first date.
+        - Treat Kevin's "8:30 to 10" as p.m.
+        - Propose a start after 9:00 a.m. EST (ends after Kevin's 10:00).
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-11-18T13:30:00Z", time_zone: Europe/Berlin, expected_local: "2026-11-18T14:30", expected_weekday: Wednesday, expected_utc_offset: "+01:00"}
+      - {instant: "2026-11-18T13:30:00Z", time_zone: America/New_York, expected_local: "2026-11-18T08:30", expected_utc_offset: "-05:00"}
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-18T00:00:00-05:00", end: "2026-11-19T00:00:00-05:00"}
+      participants:
+        candidate: {time_zone: Europe/Berlin, available: [["2026-11-18T14:00:00+01:00", "2026-11-18T16:30:00+01:00"]]}
+        int_kevin: {time_zone: America/New_York, available: [["2026-11-18T08:30:00-05:00", "2026-11-18T10:00:00-05:00"]]}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_kevin]}
+      expect_feasible: true
+      valid_examples:
+        - {S1: "2026-11-18T08:30:00-05:00"}
+      invalid_examples:
+        - {S1: "2026-11-18T09:30:00-05:00", note: "Ends 10:30 a.m. EST, after Kevin's window."}
+      valid_start_bounds:
+        S1: {earliest: "2026-11-18T08:30:00-05:00", latest: "2026-11-18T09:00:00-05:00"}
+
+  - id: TZ-053
+    title: '"Wednesday 12:00-1:00 am" from Manila - start of Wednesday or Wednesday night?'
+    category: cross_timezone
+    subcategory: twelve_hour_midnight_ambiguity
+    description: >-
+      A Manila candidate on a night schedule offers "Wednesday 12:00-1:00 am". With 12-hour clocks this could mean the first
+      hour of Wednesday, December 2 (Tuesday 11 a.m. EST in New York) or the night after Wednesday's workday, i.e. Thursday,
+      December 3, 00:00-01:00 PHT (Wednesday 11 a.m. EST). The New York interviewer is free both mornings, so the agent must
+      ask, giving explicit dates.
+    difficulty: basic
+    severity: medium
+    release_scope: mvp
+    interview_types: [phone_screen]
+    tags: [twelve_hour_clock, midnight_ambiguity, manila, new_york, cross_date]
+    requirement_refs: [INT-03, INT-05, EC-016]
+    inputs:
+      now: "2026-11-25T09:00:00-05:00"
+      recruiter: {id: rec_omar, name: Omar Haddad, time_zone: America/New_York}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Paolo Dimaculangan
+        time_zone: Asia/Manila
+        availability_raw: Wednesday 12:00-1:00 am
+      interview_plan:
+        name: Overnight Customer Support Lead - phone screen
+        sessions:
+          - {id: S1, title: Phone screen, format: phone, duration_min: 45, interviewers: [int_janet]}
+      interviewers:
+        - {id: int_janet, name: Janet Morrow, time_zone: America/New_York, availability_source: calendar, working_hours: {start: "09:00", end: "17:00"}, calendar: []}
+      conversation:
+        - role: candidate
+          channel: email
+          text: I'm on night shift - Wednesday 12:00-1:00 am is good for me.
+        - role: recruiter
+          text: Set Paolo up with Janet.
+    expected:
+      disposition: ask_clarification
+      clarifying_question_topics: [which_midnight]
+      solution_summary: >-
+        Ask whether he means Wednesday, December 2, 2026, 00:00-01:00 PHT (Tuesday, December 1, 11:00 a.m.-12:00 p.m. EST) or
+        Thursday, December 3, 00:00-01:00 PHT, i.e. Wednesday night (Wednesday, December 2, 11:00 a.m.-12:00 p.m. EST).
+      must:
+        - Explain that "Wednesday 12:00 am" can mean the start of Wednesday or the midnight at the end of Wednesday.
+        - Give both readings with explicit dates in Manila and New York.
+        - Ask the recruiter to confirm with the candidate.
+      must_not:
+        - Silently choose one reading and propose or book it.
+        - Present a time without both participants' dates.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - {instant: "2026-12-01T16:00:00Z", time_zone: Asia/Manila, expected_local: "2026-12-02T00:00", expected_weekday: Wednesday, expected_utc_offset: "+08:00"}
+      - {instant: "2026-12-01T16:00:00Z", time_zone: America/New_York, expected_local: "2026-12-01T11:00", expected_weekday: Tuesday}
+      - {instant: "2026-12-02T16:00:00Z", time_zone: Asia/Manila, expected_local: "2026-12-03T00:00", expected_weekday: Thursday}
+      - {instant: "2026-12-02T16:00:00Z", time_zone: America/New_York, expected_local: "2026-12-02T11:00", expected_weekday: Wednesday}
