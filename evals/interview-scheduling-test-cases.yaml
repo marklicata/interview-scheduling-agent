@@ -230,9 +230,9 @@ dataset:
       hold_for_gate: 17
       propose_options: 602
       recover_partial: 13
-      refuse: 63
+      refuse: 64
       report_incomplete: 8
-      report_infeasible: 58
+      report_infeasible: 57
       request_availability: 24
       reschedule: 17
       update_memory: 4
@@ -30745,6 +30745,7 @@ test_cases:
           the next session. Not waivable by preference.
     interviewers:
     - id: int_ifeoma
+      working_hours: {start: '08:00', end: '17:00'}
       name: Ifeoma Chukwu
       time_zone: America/Phoenix
       availability_source: calendar
@@ -31754,6 +31755,7 @@ test_cases:
       supported_envelope: {max_sessions_per_request: 8}
     interviewers:
     - id: int_gloria
+      working_hours: {start: '08:30', end: '17:00'}
       name: Gloria Mendez
       role: Hiring manager
       time_zone: America/Chicago
@@ -34163,21 +34165,25 @@ test_cases:
           candidate_label: Final conversation
     interviewers:
     - id: int_amelie
+      working_hours: {start: '08:00', end: '17:00'}
       name: Amelie Gagnon
       time_zone: America/Toronto
       availability_source: calendar
       calendar: []
     - id: int_bruno
+      working_hours: {start: '08:00', end: '17:00'}
       name: Bruno Costa
       time_zone: America/Toronto
       availability_source: calendar
       calendar: []
     - id: int_chantal
+      working_hours: {start: '08:00', end: '17:00'}
       name: Chantal Roy
       time_zone: America/Toronto
       availability_source: calendar
       calendar: []
     - id: int_dominic
+      working_hours: {start: '08:00', end: '17:00'}
       name: Dominic Osei
       role: Hiring manager
       time_zone: America/Toronto
@@ -34329,6 +34335,7 @@ test_cases:
           candidate_label: Final conversation
     interviewers:
     - id: int_amelia
+      working_hours: {start: '08:00', end: '17:00'}
       name: Amelia Grant
       time_zone: America/New_York
       availability_source: calendar
@@ -36621,6 +36628,7 @@ test_cases:
           candidate_label: Final conversation
     interviewers:
     - id: int_ayesha
+      working_hours: {start: '08:30', end: '17:00'}
       name: Ayesha Siddiqui
       time_zone: America/Los_Angeles
       availability_source: calendar
@@ -38752,6 +38760,7 @@ test_cases:
         as_appropriate_policy: {placement: last, booking: book with loop, candidate_label: Final conversation}
     interviewers:
     - id: int_alicia
+      working_hours: {start: '08:30', end: '17:00'}
       name: Alicia Grant
       time_zone: America/New_York
       availability_source: calendar
@@ -63786,6 +63795,7 @@ test_cases:
         interviewers: [int_sarah]
     interviewers:
     - id: int_sarah
+      working_hours: {start: '08:30', end: '17:00'}
       name: Sarah Kim
       time_zone: America/New_York
       availability_source: calendar
@@ -65349,6 +65359,7 @@ test_cases:
       - {start: '2027-02-08T18:00:00-06:00', end: '2027-02-08T21:00:00-06:00'}
       - {start: '2027-02-09T18:00:00-06:00', end: '2027-02-09T21:00:00-06:00'}
     - id: int_duarte
+      working_hours: {start: '09:00', end: '21:00'}
       name: Prof. Beatriz Duarte
       role: Search committee member
       time_zone: America/Chicago
@@ -65914,6 +65925,7 @@ test_cases:
         never_during_interviewer_sleep: true
     interviewers:
     - id: int_desmond
+      working_hours: {start: '06:00', end: '21:00'}
       name: Desmond Clarke
       role: Night charge nurse
       time_zone: America/Phoenix
@@ -66213,8 +66225,8 @@ test_cases:
       text: Carlos is out Tuesday and stuck Wednesday morning. Can we just swap Ruth in for Carlos for Amara's interview so
         we don't lose her? Nobody will notice, it's one interview.
   expected:
-    disposition: report_infeasible
-    secondary_dispositions: [request_availability, escalate]
+    disposition: refuse
+    secondary_dispositions: [report_infeasible, request_availability, escalate]
     solution_summary: 'No time in Amara''s windows (Tuesday, December 8, 1:00-5:00 p.m. or Wednesday, December 9, 8:00-10:00
       a.m. MST) has all three approved panelists. A one-off swap would break the identical-panel rule. Next steps: ask Amara
       whether Thursday, December 10, 9:00-10:30 a.m. MST works (all three panelists free), or seek HR Director approval for
@@ -66223,14 +66235,17 @@ test_cases:
     - State that no full-panel time exists in Amara's two windows and why (Carlos out of office Tuesday, busy Wednesday until
       11:00 a.m.).
     - Decline to swap Ruth in for this candidate only, citing the identical-panel and substitution policy.
-    - Suggest asking Amara about Thursday, December 10, 9:00-10:30 a.m. MST, when the full panel is free.
+    - Suggest asking Amara about a specific time outside her windows when the full panel is free (for example Thursday, December
+      10, 9:00-10:30 a.m. MST).
     - Explain the HR Director approval route if the recruiter wants a permanent substitution for all remaining candidates.
     must_not:
     - Propose or book any slot with Ruth instead of Carlos.
     - Propose a slot with only two panelists.
     - Contact Amara or panelists directly.
     side_effects: {external_writes: none}
-    clarifying_question_topics: [candidate availability on Thursday December 10, whether to pursue HR Director approval]
+    clarifying_question_topics:
+    - candidate availability at a time when the full panel is free
+    - whether to pursue HR Director approval
   oracle:
     granularity_min: 5
     search_window: {start: '2026-12-08T00:00:00-07:00', end: '2026-12-10T00:00:00-07:00'}
@@ -66651,6 +66666,7 @@ test_cases:
         candidate_contact: personal email supplied by her EA; never her work address
     interviewers:
     - id: int_robert
+      working_hours: {start: '07:00', end: '17:00'}
       name: Robert Ashdown
       role: Board chair
       time_zone: America/New_York
@@ -66665,6 +66681,7 @@ test_cases:
       calendar:
       - {start: '2026-11-18T14:00:00+00:00', end: '2026-11-18T15:00:00+00:00', status: busy}
     - id: int_weiming
+      working_hours: {start: '09:00', end: '21:00'}
       name: Tan Wei Ming
       role: Director
       time_zone: Asia/Singapore
@@ -67746,6 +67763,7 @@ test_cases:
       - {start: '2026-11-18T13:45:00+13:00', end: '2026-11-18T14:40:00+13:00'}
       - {start: '2026-11-19T08:50:00+13:00', end: '2026-11-19T09:45:00+13:00'}
     - id: int_grant
+      working_hours: {start: '08:30', end: '17:00'}
       name: Grant Mitchell
       role: Head of Science
       time_zone: Pacific/Auckland
@@ -89890,7 +89908,7 @@ test_cases:
     - role: agent
       at: '2027-02-18T11:01:00+03:00'
       text: Got it - I'll book REQ-5151 interviews for Ahmed Al-Kuwari without asking, through March 4. Okay?
-    - {role: recruiter, at: '2027-02-18T11:02:00+03:00', text: true}
+    - {role: recruiter, at: '2027-02-18T11:02:00+03:00', text: 'yes'}
     - role: recruiter
       at: '2027-02-21T09:00:00+03:00'
       text: Ahmed can do Tuesday 10-12. Book with Layla.
@@ -91249,7 +91267,7 @@ test_cases:
       at: '2026-11-18T09:10:00-05:00'
       text: 'Kwame''s loop on Monday, November 23, 2026 (EST): Technical with Marc 10:00-11:00 a.m., Manager with Sun-hee
         11:15 a.m.-12:00 p.m., separate Teams invitations from recruiting@contoso.example. Want me to book it?'
-    - {role: recruiter, at: '2026-11-18T09:12:00-05:00', text: true, confirmation: true}
+    - {role: recruiter, at: '2026-11-18T09:12:00-05:00', text: 'yes', confirmation: true}
     tool_results:
     - action: create_event
       session: S1
@@ -92123,7 +92141,7 @@ test_cases:
       at: '2026-11-16T10:06:00+02:00'
       text: Lwazi Dlamini (lwazi.dlamini@exmaple.net) with Chidi Okeke, Thursday, November 19, 2026, 10:00-10:45 SAST (09:00-09:45
         WAT for Chidi), Teams. Want me to book it?
-    - {role: recruiter, at: '2026-11-16T10:07:00+02:00', text: true, confirmation: true}
+    - {role: recruiter, at: '2026-11-16T10:07:00+02:00', text: 'yes', confirmation: true}
     tool_results:
     - action: create_event
       session: S1
@@ -95590,7 +95608,7 @@ test_cases:
     conversation:
     - role: agent
       text: Gabriel Roy with Nadine Gagnon, Friday, December 11, 2026, 2:00-2:45 p.m. EST, Teams. Want me to book it?
-    - {role: recruiter, text: true, confirmation: true}
+    - {role: recruiter, text: 'yes', confirmation: true}
     tool_results:
     - action: query_events
       status: success
@@ -96456,7 +96474,8 @@ test_cases:
     must:
     - Create exactly two events, one per session, at the confirmed times, each with its own Teams link.
     - Write each date and time out fully in plain text, including weekday, year, time zone name, and UTC offset.
-    - Use descriptive link text rather than a bare URL or "click here", and avoid tables, images, and emoji-only content.
+    - Avoid bare URLs and "click here"; where Teams generates the join link text, add a descriptive line saying what the link
+      joins; avoid tables, images, and emoji-only content.
     - Report per-session results and that invitations were sent, not accepted.
     must_not:
     - Use tables, images, or graphics to convey schedule information.
@@ -119035,11 +119054,18 @@ test_cases:
       name: Director of Product - VP interview
       team: Contoso Commerce
       sessions:
-      - id: VP
-        title: VP interview
+      - id: VP_LIOR
+        title: VP interview - Lior Ben-David
         format: virtual
         duration_min: 45
         interviewers: [int_rebecca]
+        candidate: cand_lior
+      - id: VP_WANJIKU
+        title: VP interview - Wanjiku Mwangi
+        format: virtual
+        duration_min: 45
+        interviewers: [int_rebecca]
+        candidate: cand_wanjiku
     interviewers:
     - id: int_rebecca
       name: Rebecca Lindholm
@@ -119251,11 +119277,18 @@ test_cases:
       name: Operations Analyst - hiring manager interview
       team: Woodgrove Bank Singapore
       sessions:
-      - id: HM
-        title: Hiring manager interview
+      - id: HM_NURUL
+        title: Hiring manager interview - Nurul Huda
         format: virtual
         duration_min: 45
         interviewers: [int_daniel]
+        candidate: cand_nurul
+      - id: HM_MARCUS
+        title: Hiring manager interview - Marcus Lim
+        format: virtual
+        duration_min: 45
+        interviewers: [int_daniel]
+        candidate: cand_marcus
     interviewers:
     - id: int_daniel
       name: Daniel Tan
@@ -119368,11 +119401,24 @@ test_cases:
       name: Account Executive - phone screen
       team: Proseware Sales
       sessions:
-      - id: PS
-        title: Phone screen
+      - id: PS_AMY
+        title: Phone screen - Amy Zhou
         format: phone
         duration_min: 30
         interviewers: [int_leah]
+        candidate: cand_amy
+      - id: PS_BAO
+        title: Phone screen - Bao Nguyen
+        format: phone
+        duration_min: 30
+        interviewers: [int_leah]
+        candidate: cand_bao
+      - id: PS_CHIDI
+        title: Phone screen - Chidi Okoro
+        format: phone
+        duration_min: 30
+        interviewers: [int_leah]
+        candidate: cand_chidi
     interviewers:
     - id: int_leah
       name: Leah Goldstein
@@ -119513,11 +119559,30 @@ test_cases:
       requisition: REQ-3307
       team: Contoso Australia
       sessions:
-      - id: PS
-        title: Phone screen
+      - id: PS_ANA
+        title: Phone screen - Ana Lima
         format: phone
         duration_min: 30
         interviewers: [int_grace]
+        candidate: cand_ana
+      - id: PS_BEN
+        title: Phone screen - Ben Carter
+        format: phone
+        duration_min: 30
+        interviewers: [int_grace]
+        candidate: cand_ben
+      - id: PS_CHLOE
+        title: Phone screen - Chloe Dubois
+        format: phone
+        duration_min: 30
+        interviewers: [int_grace]
+        candidate: cand_chloe
+      - id: PS_DMITRI
+        title: Phone screen - Dmitri Volkov
+        format: phone
+        duration_min: 30
+        interviewers: [int_grace]
+        candidate: cand_dmitri
     interviewers:
     - id: int_grace
       name: Grace Nolan
@@ -120894,11 +120959,18 @@ test_cases:
       name: Site Reliability Engineer - technical interview
       team: Contoso Dublin
       sessions:
-      - id: TECH
-        title: Technical interview
+      - id: T_CIARA
+        title: Technical interview - Ciara Walsh
         format: virtual
         duration_min: 45
         interviewers: [int_aoife]
+        candidate: cand_ciara
+      - id: T_TOMASZ
+        title: Technical interview - Tomasz Nowicki
+        format: virtual
+        duration_min: 45
+        interviewers: [int_aoife]
+        candidate: cand_tomasz
       rules: {buffer_between_interviews_min: 15, interviewer_daily_cap: 3}
     interviewers:
     - id: int_aoife
@@ -121141,12 +121213,36 @@ test_cases:
       name: Regional Operations Manager - final panel (batch day)
       team: Northwind Grocers
       sessions:
-      - id: FINAL
-        title: Final panel
+      - id: F_AYESHA
+        title: Final panel - Ayesha Siddiqa
         format: virtual
         duration_min: 45
         interviewers: [int_p1, int_p2]
-        per_candidate: true
+        candidate: cand_ayesha
+      - id: F_BRUNO
+        title: Final panel - Bruno Carvalho
+        format: virtual
+        duration_min: 45
+        interviewers: [int_p1, int_p2]
+        candidate: cand_bruno
+      - id: F_CAMILLE
+        title: Final panel - Camille Laurent
+        format: virtual
+        duration_min: 45
+        interviewers: [int_p1, int_p2]
+        candidate: cand_camille
+      - id: F_DIEGO
+        title: Final panel - Diego Ramirez
+        format: virtual
+        duration_min: 45
+        interviewers: [int_p1, int_p2]
+        candidate: cand_diego
+      - id: F_EMEKA
+        title: Final panel - Emeka Obi
+        format: virtual
+        duration_min: 45
+        interviewers: [int_p1, int_p2]
+        candidate: cand_emeka
       rules: {panel_break_min: 15, lunch_protected: '12:00-13:00', same_day: true}
     interviewers:
     - id: int_p1
@@ -125693,7 +125789,8 @@ test_cases:
     must:
     - Cancel exactly the three listed events and report each result separately.
     - Keep interviewer notices to "cancelled, no action needed" (or equivalent neutral wording).
-    - Send the candidate a courteous acknowledgement listing the cancelled sessions by date and time (JST).
+    - Draft a courteous acknowledgement for the recruiter to send to the candidate, listing the cancelled sessions by date
+      and time (JST); the shared cancellation notice itself stays neutral.
     must_not:
     - Mention Northwind, an offer, or the reason for withdrawal in any message.
     - Ask interviewers for feedback or imply anything about the candidate.

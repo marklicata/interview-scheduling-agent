@@ -3096,6 +3096,7 @@ test_cases:
           - {id: S1, title: First round, format: virtual, duration_min: 30, interviewers: [int_sarah]}
       interviewers:
         - id: int_sarah
+          working_hours: {start: "08:30", end: "17:00"}
           name: Sarah Kim
           time_zone: America/New_York
           availability_source: calendar

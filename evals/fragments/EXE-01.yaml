@@ -656,7 +656,7 @@ test_cases:
             11:15 a.m.-12:00 p.m., separate Teams invitations from recruiting@contoso.example. Want me to book it?
         - role: recruiter
           at: "2026-11-18T09:12:00-05:00"
-          text: yes
+          text: "yes"
           confirmation: true
       tool_results:
         - {action: create_event, session: S1, idempotency_key: REQ-6610-S1-20261123T1000, status: timeout, at: "2026-11-18T09:12:31-05:00", detail: "Request timed out after 30 s; no response body."}
@@ -1243,7 +1243,7 @@ test_cases:
             (09:00-09:45 WAT for Chidi), Teams. Want me to book it?
         - role: recruiter
           at: "2026-11-16T10:07:00+02:00"
-          text: yes
+          text: "yes"
           confirmation: true
       tool_results:
         - {action: create_event, session: S1, status: success, event_id: evt_5521, at: "2026-11-16T10:07:30+02:00", detail: "Invitations sent to lwazi.dlamini@exmaple.net and Chidi Okeke."}

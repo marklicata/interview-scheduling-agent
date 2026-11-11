@@ -67,12 +67,20 @@ def _add_selection_args(p):
     p.add_argument("--release-scope", dest="release_scopes", action="append", default=[])
     p.add_argument("--tag", dest="tags", action="append", default=[])
     p.add_argument("--limit", type=int, default=0)
+    p.add_argument("--per-category", type=int, default=0,
+                   help="sample N cases per category, evenly spread across each category (same sample every run)")
+    p.add_argument("--case-file", help="file listing case ids, one per line ('#' comments allowed)")
 
 
 def _selection(args) -> Selection:
-    return Selection(ids=args.ids, exclude_ids=args.exclude_ids, categories=args.categories,
+    ids = list(args.ids)
+    if getattr(args, "case_file", None):
+        with open(args.case_file, encoding="utf-8") as fh:
+            ids += [ln.split("#", 1)[0].strip() for ln in fh if ln.split("#", 1)[0].strip()]
+    return Selection(ids=ids, exclude_ids=args.exclude_ids, categories=args.categories,
                      severities=args.severities, difficulties=args.difficulties, authority_modes=args.authority_modes,
-                     release_scopes=args.release_scopes, tags=args.tags, limit=args.limit)
+                     release_scopes=args.release_scopes, tags=args.tags, limit=args.limit,
+                     per_category=args.per_category)
 
 
 def _run_id(agent_name: str, suffix: str = "") -> str:

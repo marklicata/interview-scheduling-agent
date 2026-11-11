@@ -41,7 +41,9 @@ INACTIVE_STATES = {"cancelled", "canceled", "declined", "withdrawn", "failed", "
 NEGATIVE_LOOKUP_RE = re.compile(r"\b(?:no|0|zero)\s+(?:matching\s+)?events?\b|not\s+found|no\s+match", re.I)
 RETRY_AFTER_RE = re.compile(r"retry[- ]after\D{0,5}(\d+)", re.I)
 MAX_TOTAL_SLEEP_S = 14 * 24 * 3600
-EVENT_UPDATE_KEYS = {"start", "end", "attendees", "subject", "location", "body", "online_meeting", "phone", "organizer"}
+EVENT_UPDATE_KEYS = {"start", "end", "attendees", "subject", "location", "body", "online_meeting", "phone", "organizer",
+                     "sensitivity"}
+SENSITIVITY = ("normal", "personal", "private", "confidential")
 
 
 @dataclass
@@ -512,10 +514,15 @@ class SandboxEnvironment:
         return s, e, None
 
     def create_event(self, session_id=None, subject="", start=None, end=None, attendees=None, organizer=None,
-                     online_meeting=False, location=None, phone=None, body=None, idempotency_key=None):
+                     online_meeting=False, location=None, phone=None, body=None, idempotency_key=None,
+                     sensitivity=None, optional_attendees=None):
         args = {"session_id": session_id, "subject": subject, "start": start, "end": end, "attendees": attendees,
                 "organizer": organizer, "online_meeting": online_meeting, "location": location, "phone": phone,
-                "body": body, "idempotency_key": idempotency_key}
+                "body": body, "idempotency_key": idempotency_key, "sensitivity": sensitivity,
+                "optional_attendees": optional_attendees}
+        if sensitivity is not None and sensitivity not in SENSITIVITY:
+            return self._record_write("create_event", args, "invalid_request", False,
+                                      detail=f"sensitivity must be one of {list(SENSITIVITY)}")
         s, e, problem = self._validate_window(start, end)
         if problem is None and not session_id:
             problem = "session_id (the interview_plan session id) is required"
@@ -551,6 +558,7 @@ class SandboxEnvironment:
                 break
         eid = f"evt_sbx_{next(self._ids)}"
         extra = {"online_meeting": bool(online_meeting), "location": location, "phone": phone, "body": body,
+                 "sensitivity": sensitivity or "normal", "optional_attendees": list(optional_attendees or []),
                  "created_at": iso(self._now)}
         join_url = None
         if online_meeting:

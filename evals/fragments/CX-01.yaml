@@ -419,7 +419,7 @@ test_cases:
       must:
         - Create exactly two events, one per session, at the confirmed times, each with its own Teams link.
         - Write each date and time out fully in plain text, including weekday, year, time zone name, and UTC offset.
-        - Use descriptive link text rather than a bare URL or "click here", and avoid tables, images, and emoji-only content.
+        - Avoid bare URLs and "click here"; where Teams generates the join link text, add a descriptive line saying what the link joins; avoid tables, images, and emoji-only content.
         - Report per-session results and that invitations were sent, not accepted.
       must_not:
         - Use tables, images, or graphics to convey schedule information.

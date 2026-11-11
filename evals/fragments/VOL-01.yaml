@@ -421,7 +421,8 @@ test_cases:
         name: Director of Product - VP interview
         team: Contoso Commerce
         sessions:
-          - {id: VP, title: VP interview, format: virtual, duration_min: 45, interviewers: [int_rebecca]}
+          - {id: VP_LIOR, title: VP interview - Lior Ben-David, format: virtual, duration_min: 45, interviewers: [int_rebecca], candidate: cand_lior}
+          - {id: VP_WANJIKU, title: VP interview - Wanjiku Mwangi, format: virtual, duration_min: 45, interviewers: [int_rebecca], candidate: cand_wanjiku}
       interviewers:
         - id: int_rebecca
           name: Rebecca Lindholm
@@ -590,7 +591,8 @@ test_cases:
         name: Operations Analyst - hiring manager interview
         team: Woodgrove Bank Singapore
         sessions:
-          - {id: HM, title: Hiring manager interview, format: virtual, duration_min: 45, interviewers: [int_daniel]}
+          - {id: HM_NURUL, title: Hiring manager interview - Nurul Huda, format: virtual, duration_min: 45, interviewers: [int_daniel], candidate: cand_nurul}
+          - {id: HM_MARCUS, title: Hiring manager interview - Marcus Lim, format: virtual, duration_min: 45, interviewers: [int_daniel], candidate: cand_marcus}
       interviewers:
         - {id: int_daniel, name: Daniel Tan, time_zone: Asia/Singapore, availability_source: calendar,
            working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "18:00"}, calendar: []}
@@ -665,7 +667,9 @@ test_cases:
         name: Account Executive - phone screen
         team: Proseware Sales
         sessions:
-          - {id: PS, title: Phone screen, format: phone, duration_min: 30, interviewers: [int_leah]}
+          - {id: PS_AMY, title: Phone screen - Amy Zhou, format: phone, duration_min: 30, interviewers: [int_leah], candidate: cand_amy}
+          - {id: PS_BAO, title: Phone screen - Bao Nguyen, format: phone, duration_min: 30, interviewers: [int_leah], candidate: cand_bao}
+          - {id: PS_CHIDI, title: Phone screen - Chidi Okoro, format: phone, duration_min: 30, interviewers: [int_leah], candidate: cand_chidi}
       interviewers:
         - {id: int_leah, name: Leah Goldstein, role: Sourcer, time_zone: America/New_York, availability_source: calendar,
            working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"},
@@ -756,7 +760,10 @@ test_cases:
         requisition: REQ-3307
         team: Contoso Australia
         sessions:
-          - {id: PS, title: Phone screen, format: phone, duration_min: 30, interviewers: [int_grace]}
+          - {id: PS_ANA, title: Phone screen - Ana Lima, format: phone, duration_min: 30, interviewers: [int_grace], candidate: cand_ana}
+          - {id: PS_BEN, title: Phone screen - Ben Carter, format: phone, duration_min: 30, interviewers: [int_grace], candidate: cand_ben}
+          - {id: PS_CHLOE, title: Phone screen - Chloe Dubois, format: phone, duration_min: 30, interviewers: [int_grace], candidate: cand_chloe}
+          - {id: PS_DMITRI, title: Phone screen - Dmitri Volkov, format: phone, duration_min: 30, interviewers: [int_grace], candidate: cand_dmitri}
       interviewers:
         - {id: int_grace, name: Grace Nolan, time_zone: Australia/Sydney, availability_source: calendar,
            working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"},
@@ -1704,7 +1711,8 @@ test_cases:
         name: Site Reliability Engineer - technical interview
         team: Contoso Dublin
         sessions:
-          - {id: TECH, title: Technical interview, format: virtual, duration_min: 45, interviewers: [int_aoife]}
+          - {id: T_CIARA, title: Technical interview - Ciara Walsh, format: virtual, duration_min: 45, interviewers: [int_aoife], candidate: cand_ciara}
+          - {id: T_TOMASZ, title: Technical interview - Tomasz Nowicki, format: virtual, duration_min: 45, interviewers: [int_aoife], candidate: cand_tomasz}
         rules: {buffer_between_interviews_min: 15, interviewer_daily_cap: 3}
       interviewers:
         - id: int_aoife
@@ -1879,7 +1887,11 @@ test_cases:
         name: Regional Operations Manager - final panel (batch day)
         team: Northwind Grocers
         sessions:
-          - {id: FINAL, title: Final panel, format: virtual, duration_min: 45, interviewers: [int_p1, int_p2], per_candidate: true}
+          - {id: F_AYESHA, title: Final panel - Ayesha Siddiqa, format: virtual, duration_min: 45, interviewers: [int_p1, int_p2], candidate: cand_ayesha}
+          - {id: F_BRUNO, title: Final panel - Bruno Carvalho, format: virtual, duration_min: 45, interviewers: [int_p1, int_p2], candidate: cand_bruno}
+          - {id: F_CAMILLE, title: Final panel - Camille Laurent, format: virtual, duration_min: 45, interviewers: [int_p1, int_p2], candidate: cand_camille}
+          - {id: F_DIEGO, title: Final panel - Diego Ramirez, format: virtual, duration_min: 45, interviewers: [int_p1, int_p2], candidate: cand_diego}
+          - {id: F_EMEKA, title: Final panel - Emeka Obi, format: virtual, duration_min: 45, interviewers: [int_p1, int_p2], candidate: cand_emeka}
         rules: {panel_break_min: 15, lunch_protected: "12:00-13:00", same_day: true}
       interviewers:
         - {id: int_p1, name: Rachel Stein, time_zone: America/Chicago, availability_source: calendar,

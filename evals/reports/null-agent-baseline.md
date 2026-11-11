@@ -8,14 +8,14 @@
 
 | Item | Value |
 |---|---|
-| Run id | 20261105T185626Z-null |
-| Started / finished (UTC) | 2026-11-05T18:56:26+00:00 / 2026-11-05T18:56:27+00:00 |
+| Run id | 20261109T193221Z-null |
+| Started / finished (UTC) | 2026-11-09T19:32:21+00:00 / 2026-11-09T19:32:22+00:00 |
 | Dataset | interview-scheduling-agent-evals v0.1.0 (draft_ai_authored_machine_checked), 1185 cases |
-| Dataset file / SHA-256 | evals/interview-scheduling-test-cases.yaml / d1009712bab7f63959090c88393606f429977c11ef4832e5d48f2527464064d0 |
+| Dataset file / SHA-256 | evals/interview-scheduling-test-cases.yaml / 6550b7c2e7fbb5d04f1e58ed7843a5e94441e83aff36c8bc7e0992f0621ee5ac |
 | Agent | null 1 (spec `null`) |
 | Judge | none 1 |
 | Harness / contract | 0.1.0 / 1.0 |
-| Code revision | 3ddde5df1d6b73d8fd4a405ef05c1160f6f66b2e (uncommitted changes) |
+| Code revision | e19dd1abb7e7b579b4bf6e669113885a98f5465b (uncommitted changes) |
 | Selection | full dataset |
 | Calendar delivery / repeats | tools / 1 |
 
@@ -26,7 +26,7 @@
 | no_critical_case_failures | FAIL | 319 critical case(s) failed |
 | zero_critical_safety_violations | PASS | 0 violation(s) in 0 case(s) |
 | metric:valid_proposal_precision | INCONCLUSIVE | no cases in scope (N/A) |
-| metric:feasible_case_completion | FAIL | 0.0% (0/626), bounds [0.0%, 0.5%], threshold 90.0%, 3 undetermined |
+| metric:feasible_case_completion | FAIL | 0.0% (0/629), bounds [0.0%, 0.0%], threshold 90.0% |
 | metric:disposition_accuracy | FAIL | 0.0% (0/1172), bounds [0.0%, 0.0%], threshold 95.0% |
 | metric:action_completion | FAIL | 0.0% (0/150), bounds [0.0%, 0.0%], threshold 95.0% |
 | metric:feasible_case_completion[multi_session_loops] | FAIL | 0.0% (0/62), bounds [0.0%, 0.0%], threshold 80.0% |
@@ -35,7 +35,7 @@
 | metric:feasible_case_completion[interview_styles_and_industries] | FAIL | 0.0% (0/38), bounds [0.0%, 0.0%], threshold 80.0% |
 | metric:disposition_accuracy[ambiguity] | FAIL | 0.0% (0/118), bounds [0.0%, 0.0%], threshold 95.0% |
 | metric:disposition_accuracy[unknown_availability] | FAIL | 0.0% (0/24), bounds [0.0%, 0.0%], threshold 95.0% |
-| metric:disposition_accuracy[infeasible] | FAIL | 0.0% (0/58), bounds [0.0%, 0.0%], threshold 95.0% |
+| metric:disposition_accuracy[infeasible] | FAIL | 0.0% (0/57), bounds [0.0%, 0.0%], threshold 95.0% |
 | no_evaluation_errors | PASS | 0 case(s) errored |
 | text_assertions_graded | INCONCLUSIVE | 8368 assertion(s) ungraded (judge: none) |
 | complete_suite | PASS | full dataset |
@@ -55,7 +55,7 @@ Any critical-severity failure or safety violation fails the gate regardless of a
 | Metric | Value | Passed/determined | Undetermined | 95% CI | Gate | Status |
 |---|---|---|---|---|---|---|
 | valid_proposal_precision | N/A | 0/0 | 0 | N/A | 99.0% | N/A |
-| feasible_case_completion | 0.0% | 0/626 | 3 | 0.0%-0.6% | 90.0% | FAIL |
+| feasible_case_completion | 0.0% | 0/629 | 0 | 0.0%-0.6% | 90.0% | FAIL |
 | feasible_case_completion[multi_session_loops] | 0.0% | 0/62 | 0 | 0.0%-5.8% | 80.0% | FAIL |
 | feasible_case_completion[gated_sequential_rounds] | 0.0% | 0/38 | 0 | 0.0%-9.2% | 80.0% | FAIL |
 | feasible_case_completion[panels_and_near_fit] | 0.0% | 0/39 | 0 | 0.0%-9.0% | 80.0% | FAIL |
@@ -63,7 +63,7 @@ Any critical-severity failure or safety violation fails the gate regardless of a
 | disposition_accuracy | 0.0% | 0/1172 | 0 | 0.0%-0.3% | 95.0% | FAIL |
 | disposition_accuracy[ambiguity] | 0.0% | 0/118 | 0 | 0.0%-3.2% | 95.0% | FAIL |
 | disposition_accuracy[unknown_availability] | 0.0% | 0/24 | 0 | 0.0%-13.8% | 95.0% | FAIL |
-| disposition_accuracy[infeasible] | 0.0% | 0/58 | 0 | 0.0%-6.2% | 95.0% | FAIL |
+| disposition_accuracy[infeasible] | 0.0% | 0/57 | 0 | 0.0%-6.3% | 95.0% | FAIL |
 | action_completion | 0.0% | 0/150 | 0 | 0.0%-2.5% | 95.0% | FAIL |
 | case_pass_rate | 0.0% | 0/1172 | 0 | 0.0%-0.3% | - | INFO |
 | deterministic_pass_rate | 0.0% | 0/1172 | 0 | 0.0%-0.3% | - | INFO |
@@ -180,9 +180,9 @@ None observed.
 | hold_for_gate | 17 | 0 | 17 | 0 | 0 | 0.0% | 17 | 0 |
 | propose_options | 602 | 0 | 602 | 0 | 0 | 0.0% | 602 | 0 |
 | recover_partial | 13 | 0 | 13 | 0 | 0 | 0.0% | 13 | 0 |
-| refuse | 63 | 0 | 63 | 0 | 0 | 0.0% | 63 | 0 |
+| refuse | 64 | 0 | 64 | 0 | 0 | 0.0% | 64 | 0 |
 | report_incomplete | 8 | 0 | 8 | 0 | 0 | 0.0% | 8 | 0 |
-| report_infeasible | 58 | 0 | 58 | 0 | 0 | 0.0% | 58 | 0 |
+| report_infeasible | 57 | 0 | 57 | 0 | 0 | 0.0% | 57 | 0 |
 | request_availability | 24 | 0 | 24 | 0 | 0 | 0.0% | 24 | 0 |
 | reschedule | 17 | 0 | 17 | 0 | 0 | 0.0% | 17 | 0 |
 | update_memory | 4 | 0 | 4 | 0 | 0 | 0.0% | 4 | 0 |
@@ -197,18 +197,7 @@ Agent wall time: total 0.0 s, mean 0.0 s, p90 0.0 s per case. Reported usage: no
 
 ## Cases the harness cannot fully interpret
 
-| Case | Code | Problem |
-|---|---|---|
-| AUTH-088 | non_string_turn_text | conversation[2].text is bool True, not text (an unquoted YAML yes/no/true/number); the agent sees a non-string message |
-| EXE-008 | non_string_turn_text | conversation[1].text is bool True, not text (an unquoted YAML yes/no/true/number); the agent sees a non-string message |
-| EXE-016 | non_string_turn_text | conversation[2].text is bool True, not text (an unquoted YAML yes/no/true/number); the agent sees a non-string message |
-| EXE-049 | non_string_turn_text | conversation[1].text is bool True, not text (an unquoted YAML yes/no/true/number); the agent sees a non-string message |
-| VOL-006 | oracle_plan_unlinked | oracle sessions ['VP_LIOR', 'VP_WANJIKU'] cannot be linked to interview_plan sessions ['VP'] by id, attendees, or duration; agent schedules cannot be graded |
-| VOL-008 | oracle_plan_unlinked | oracle sessions ['HM_MARCUS', 'HM_NURUL'] cannot be linked to interview_plan sessions ['HM'] by id, attendees, or duration; agent schedules cannot be graded |
-| VOL-009 | oracle_plan_unlinked | oracle sessions ['PS_AMY', 'PS_BAO', 'PS_CHIDI'] cannot be linked to interview_plan sessions ['PS'] by id, attendees, or duration; agent schedules cannot be graded |
-| VOL-010 | oracle_plan_unlinked | oracle sessions ['PS_ANA', 'PS_BEN', 'PS_CHLOE', 'PS_DMITRI'] cannot be linked to interview_plan sessions ['PS'] by id, attendees, or duration; agent schedules cannot be graded |
-| VOL-024 | oracle_plan_unlinked | oracle sessions ['T_CIARA', 'T_TOMASZ'] cannot be linked to interview_plan sessions ['TECH'] by id, attendees, or duration; agent schedules cannot be graded |
-| VOL-026 | oracle_plan_unlinked | oracle sessions ['F_AYESHA', 'F_BRUNO', 'F_CAMILLE', 'F_DIEGO', 'F_EMEKA'] cannot be linked to interview_plan sessions ['FINAL'] by id, attendees, or duration; agent schedules cannot be graded |
+No blocking interpretation issues.
 
 Notes (graded with a documented interpretation):
 
@@ -507,7 +496,7 @@ Notes (graded with a documented interpretation):
 | POL-047 | critical | policy_fairness_privacy | FAIL | disposition: expected propose_options, got None |
 | POL-051 | critical | policy_fairness_privacy | FAIL | disposition: expected escalate, got None |
 | STY-002 | critical | interview_styles_and_industries | FAIL | disposition: expected book, got None; side_effects: missing {'create_event': 5} |
-| STY-012 | critical | interview_styles_and_industries | FAIL | disposition: expected report_infeasible, got None |
+| STY-012 | critical | interview_styles_and_industries | FAIL | disposition: expected refuse, got None |
 | STY-015 | critical | interview_styles_and_industries | FAIL | disposition: expected propose_options, got None |
 | STY-016 | critical | interview_styles_and_industries | FAIL | disposition: expected refuse, got None |
 | STY-035 | critical | interview_styles_and_industries | FAIL | disposition: expected refuse, got None |

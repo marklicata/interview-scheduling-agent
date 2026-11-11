@@ -947,7 +947,7 @@ test_cases:
           max_gap_between_sessions_min: 30
           as_appropriate_policy: {placement: last, booking: book with loop, candidate_label: Final conversation}
       interviewers:
-        - {id: int_alicia, name: Alicia Grant, time_zone: America/New_York, availability_source: calendar, calendar: []}
+        - {id: int_alicia, working_hours: {start: "08:30", end: "17:00"}, name: Alicia Grant, time_zone: America/New_York, availability_source: calendar, calendar: []}
         - {id: int_benjamin, name: Benjamin Reyes, time_zone: America/New_York, availability_source: calendar,
            calendar: [{start: "2027-03-23T08:00:00-04:00", end: "2027-03-23T09:30:00-04:00", status: busy}]}
         - {id: int_chiara, name: Chiara Russo, time_zone: America/New_York, availability_source: calendar, calendar: []}

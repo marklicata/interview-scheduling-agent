@@ -2464,7 +2464,7 @@ test_cases:
       must:
         - Cancel exactly the three listed events and report each result separately.
         - Keep interviewer notices to "cancelled, no action needed" (or equivalent neutral wording).
-        - Send the candidate a courteous acknowledgement listing the cancelled sessions by date and time (JST).
+        - Draft a courteous acknowledgement for the recruiter to send to the candidate, listing the cancelled sessions by date and time (JST); the shared cancellation notice itself stays neutral.
       must_not:
         - Mention Northwind, an offer, or the reason for withdrawal in any message.
         - Ask interviewers for feedback or imply anything about the candidate.

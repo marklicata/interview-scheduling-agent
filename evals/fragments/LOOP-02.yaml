@@ -724,10 +724,10 @@ test_cases:
           max_gap_between_sessions_min: 30
           as_appropriate_policy: {placement: "last - the AA interviewer reviews the loop feedback first", booking: book with loop, decision_owner: hiring manager, candidate_label: Final conversation}
       interviewers:
-        - {id: int_amelie, name: Amelie Gagnon, time_zone: America/Toronto, availability_source: calendar, calendar: []}
-        - {id: int_bruno, name: Bruno Costa, time_zone: America/Toronto, availability_source: calendar, calendar: []}
-        - {id: int_chantal, name: Chantal Roy, time_zone: America/Toronto, availability_source: calendar, calendar: []}
-        - {id: int_dominic, name: Dominic Osei, role: Hiring manager, time_zone: America/Toronto, availability_source: calendar, calendar: []}
+        - {id: int_amelie, working_hours: {start: "08:00", end: "17:00"}, name: Amelie Gagnon, time_zone: America/Toronto, availability_source: calendar, calendar: []}
+        - {id: int_bruno, working_hours: {start: "08:00", end: "17:00"}, name: Bruno Costa, time_zone: America/Toronto, availability_source: calendar, calendar: []}
+        - {id: int_chantal, working_hours: {start: "08:00", end: "17:00"}, name: Chantal Roy, time_zone: America/Toronto, availability_source: calendar, calendar: []}
+        - {id: int_dominic, working_hours: {start: "08:00", end: "17:00"}, name: Dominic Osei, role: Hiring manager, time_zone: America/Toronto, availability_source: calendar, calendar: []}
         - {id: int_rajiv, name: Rajiv Malhotra, role: VP (AA), time_zone: America/Toronto, availability_source: calendar,
            calendar: [{start: "2026-12-16T09:00:00-05:00", end: "2026-12-16T18:00:00-05:00", status: busy}]}
       conversation:
@@ -817,7 +817,7 @@ test_cases:
           max_gap_between_sessions_min: 30
           as_appropriate_policy: {placement: last, booking: book with loop and cancel only the AA if not needed, decision_owner: hiring manager, candidate_label: Final conversation}
       interviewers:
-        - {id: int_amelia, name: Amelia Grant, time_zone: America/New_York, availability_source: calendar, calendar: []}
+        - {id: int_amelia, working_hours: {start: "08:00", end: "17:00"}, name: Amelia Grant, time_zone: America/New_York, availability_source: calendar, calendar: []}
         - {id: int_bjorn, name: Bjorn Lindahl, time_zone: America/New_York, availability_source: calendar,
            calendar: [{start: "2027-01-12T08:00:00-05:00", end: "2027-01-12T08:45:00-05:00", status: busy}]}
         - {id: int_carmen, name: Carmen Ortiz, time_zone: America/New_York, availability_source: calendar, calendar: []}
@@ -2142,7 +2142,7 @@ test_cases:
           max_gap_between_items_min: 20
           as_appropriate_policy: {placement: last, booking: book with loop, decision_owner: hiring manager (Devon Price), candidate_label: Final conversation}
       interviewers:
-        - {id: int_ayesha, name: Ayesha Siddiqui, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
+        - {id: int_ayesha, working_hours: {start: "08:30", end: "17:00"}, name: Ayesha Siddiqui, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}
         - {id: int_brandon, name: Brandon Yazzie, time_zone: America/Los_Angeles, availability_source: calendar,
            calendar: [{start: "2026-12-17T08:00:00-08:00", end: "2026-12-17T09:15:00-08:00", status: busy}]}
         - {id: int_chiamaka, name: Chiamaka Eze, time_zone: America/Los_Angeles, availability_source: calendar, calendar: []}

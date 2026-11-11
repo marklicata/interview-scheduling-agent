@@ -1,0 +1,46 @@
+"""The calendar/mail provider interface the core depends on.
+
+Hosts supply an object with these methods. The evaluation harness passes its sandbox; the Microsoft 365 host
+passes a Microsoft Graph implementation (hosts/m365/graph_tools.py). Arguments and results are JSON-compatible,
+timestamps are ISO 8601 with offsets, and people are named by id, name, or email.
+
+Statuses returned by get_schedule per participant: ok (with events), unknown, no_calendar, permission_denied,
+unavailable, not_found. Only "ok" means the absence of an event is free time.
+
+Write results carry status: success, deduplicated, throttled (with retry_after_s), permission_denied, not_found,
+already_cancelled, or invalid_request.
+"""
+from __future__ import annotations
+
+from typing import Any, Protocol
+
+
+class CalendarProvider(Protocol):
+    def now(self) -> Any: ...
+    def sleep(self, seconds): ...
+    def get_schedule(self, participant_ids, start, end): ...
+    def find_events(self, session_id=None, idempotency_key=None, attendee=None, start=None, end=None,
+                    include_cancelled=False): ...
+    def get_event(self, event_id): ...
+    def acquire_booking_lock(self, key): ...
+    def release_booking_lock(self, key): ...
+    def create_event(self, session_id=None, subject="", start=None, end=None, attendees=None, organizer=None,
+                     online_meeting=False, location=None, phone=None, body=None, idempotency_key=None,
+                     sensitivity=None, optional_attendees=None): ...
+    def update_event(self, event_id, changes=None, notify_attendees=True): ...
+    def cancel_event(self, event_id, message=None): ...
+    def send_message(self, to=None, subject="", body="", channel="email"): ...
+    def create_online_meeting(self, session_id=None, subject=None, start=None, end=None): ...
+    def create_hold(self, attendees=None, start=None, end=None, subject=None, expires=None): ...
+    def publish(self, destination=None, record_id=None, payload=None): ...
+
+
+WRITE_METHODS = {
+    "create_event": "book",
+    "update_event": "reschedule",
+    "cancel_event": "cancel",
+    "send_message": "send_message",
+    "create_online_meeting": "book",
+    "create_hold": "hold",
+    "publish": "publish",
+}

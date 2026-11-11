@@ -68,10 +68,12 @@ class Selection:
     release_scopes: list = field(default_factory=list)
     tags: list = field(default_factory=list)
     limit: int = 0
+    per_category: int = 0   # deterministic sample: N cases per category, evenly spread across the category
 
     def is_full(self) -> bool:
         return not (self.ids or self.exclude_ids or self.categories or self.severities or self.difficulties
-                    or self.authority_modes or self.release_scopes or self.tags or self.limit)
+                    or self.authority_modes or self.release_scopes or self.tags or self.limit
+                    or self.per_category)
 
     def describe(self) -> dict:
         return {k: v for k, v in self.__dict__.items() if v}
@@ -82,6 +84,7 @@ def select_cases(cases: list, sel: Selection) -> list:
     for c in sel.categories:
         cats.add(CATEGORIES.get(c.upper(), c))
     out = []
+    per_cat: dict = {}  # category -> matching cases (per_category sampling)
     for case in cases:
         if not isinstance(case, dict):
             continue
@@ -103,9 +106,21 @@ def select_cases(cases: list, sel: Selection) -> list:
             continue
         if sel.tags and not (set(sel.tags) & set(case.get("tags") or [])):
             continue
+        if sel.per_category:
+            per_cat.setdefault(case.get("category"), []).append(case)
+            continue
         out.append(case)
         if sel.limit and len(out) >= sel.limit:
             break
+    if sel.per_category:
+        keep = set()
+        for group in per_cat.values():
+            n = len(group)
+            k = min(sel.per_category, n)
+            keep.update(id(group[(i * n) // k]) for i in range(k))
+        out = [c for c in cases if id(c) in keep]
+        if sel.limit:
+            out = out[:sel.limit]
     return out
 
 

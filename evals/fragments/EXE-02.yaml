@@ -1649,7 +1649,7 @@ test_cases:
         - role: agent
           text: Gabriel Roy with Nadine Gagnon, Friday, December 11, 2026, 2:00-2:45 p.m. EST, Teams. Want me to book it?
         - role: recruiter
-          text: yes
+          text: "yes"
           confirmation: true
       tool_results:
         - {action: query_events, status: success, detail: "Found 'Interview: Gabriel Roy - HM' Friday 2:00-2:45 p.m. EST, organizer priya.anand@contoso.example (coordinator), created 2026-12-06 16:20, attendees Gabriel Roy (accepted) and Nadine Gagnon (accepted), Teams link present."}

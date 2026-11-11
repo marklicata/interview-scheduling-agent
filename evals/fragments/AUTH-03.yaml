@@ -1440,7 +1440,7 @@ test_cases:
           text: Got it - I'll book REQ-5151 interviews for Ahmed Al-Kuwari without asking, through March 4. Okay?
         - role: recruiter
           at: "2027-02-18T11:02:00+03:00"
-          text: yes
+          text: "yes"
         - role: recruiter
           at: "2027-02-21T09:00:00+03:00"
           text: Ahmed can do Tuesday 10-12. Book with Layla.

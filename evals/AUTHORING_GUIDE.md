@@ -112,7 +112,9 @@ test_cases:
           expires: "..."
           status: active|expired|revoked  # optional
       candidate: {id: candidate, name: ..., time_zone: IANA or omit, time_zone_raw: "CST" (if user-written), availability: [{start, end}], ...}
-      interview_plan: {name, region, team, role, time_zone?, sessions: [{id, title, format, duration_min, interviewers|pool, order?, conditional?, gate?}], rules: {...}}
+      interview_plan: {name, region, team, role, time_zone?, sessions: [{id, title, format, duration_min, interviewers|pool, candidate?, order?, conditional?, gate?}], rules: {...}}
+      # Multiple candidates (inputs.candidates): list one plan session per candidate, with candidate: <id>
+      # and the same id as the matching oracle session, so the harness can grade the agent's schedule.
       interviewers: [{id, name, role?, time_zone, availability_source: calendar|supplied|mixed|none, working_hours?, calendar: [{start, end, status, subject?}], supplied_availability: [...], supplied_blocks: {...}}]
       policies: {...}                     # org policy facts the expected answer relies on
       case_state: {existing_bookings: [...], round_results: [...], memory: {...}, prior_proposals: [...]}  # optional

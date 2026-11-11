@@ -1184,7 +1184,7 @@ test_cases:
           max_gap_between_sessions_min: 15
           mandatory_break: After 120 minutes of interviewing without a break, the candidate gets a 30-60 minute break before the next session. Not waivable by preference.
       interviewers:
-        - {id: int_ifeoma, name: Ifeoma Chukwu, time_zone: America/Phoenix, availability_source: calendar, calendar: []}
+        - {id: int_ifeoma, working_hours: {start: "08:00", end: "17:00"}, name: Ifeoma Chukwu, time_zone: America/Phoenix, availability_source: calendar, calendar: []}
         - {id: int_jorge, name: Jorge Salazar, time_zone: America/Phoenix, availability_source: calendar, calendar: []}
         - {id: int_kalani, name: Kalani Akana, time_zone: America/Phoenix, availability_source: calendar,
            calendar: [{start: "2026-12-02T08:00:00-07:00", end: "2026-12-02T10:30:00-07:00", status: busy}]}
@@ -1739,7 +1739,7 @@ test_cases:
       policies:
         supported_envelope: {max_sessions_per_request: 8}
       interviewers:
-        - {id: int_gloria, name: Gloria Mendez, role: Hiring manager, time_zone: America/Chicago, availability_source: calendar,
+        - {id: int_gloria, working_hours: {start: "08:30", end: "17:00"}, name: Gloria Mendez, role: Hiring manager, time_zone: America/Chicago, availability_source: calendar,
            calendar: [{start: "2026-12-17T09:30:00-06:00", end: "2026-12-17T17:30:00-06:00", status: busy}]}
         - {id: int_hamid, name: Hamid Rahimi, time_zone: America/Chicago, availability_source: calendar, calendar: []}
         - {id: int_pavel, name: Pavel Novotny, time_zone: America/Chicago, availability_source: calendar,
