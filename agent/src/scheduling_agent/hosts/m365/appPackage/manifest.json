@@ -2,7 +2,7 @@
   "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.22/MicrosoftTeams.schema.json",
   "manifestVersion": "1.22",
   "version": "0.1.0",
-  "id": "${{TEAMS_APP_ID}}",
+  "id": "cf544c08-24ce-436d-8148-a3e36acaa184",
   "developer": {
     "name": "Contoso Recruiting Operations",
     "websiteUrl": "https://www.contoso.example",
@@ -18,7 +18,7 @@
   "accentColor": "#2F5DA8",
   "bots": [
     {
-      "botId": "${{BOT_ID}}",
+      "botId": "f3e4db63-aac4-4ebf-a31f-294172043631",
       "scopes": ["personal", "copilot"],
       "supportsFiles": false,
       "isNotificationOnly": false,
@@ -36,13 +36,13 @@
   "copilotAgents": {
     "customEngineAgents": [
       {
-        "id": "${{BOT_ID}}",
+        "id": "f3e4db63-aac4-4ebf-a31f-294172043631",
         "type": "bot",
         "disclaimer": { "text": "Proposals are not reservations. Nothing is booked or sent until you confirm, unless you have explicitly enabled autonomous scheduling." }
       }
     ]
   },
   "permissions": ["identity"],
-  "validDomains": ["${{BOT_DOMAIN}}"],
-  "webApplicationInfo": { "id": "${{BOT_ID}}", "resource": "api://botid-${{BOT_ID}}" }
+  "validDomains": ["interview-scheduling-agent.graymushroom-d48b33a6.westus2.azurecontainerapps.io"],
+  "webApplicationInfo": { "id": "f3e4db63-aac4-4ebf-a31f-294172043631", "resource": "api://botid-f3e4db63-aac4-4ebf-a31f-294172043631" }
 }

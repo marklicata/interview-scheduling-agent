@@ -1,0 +1,30 @@
+# Version control
+.git/
+.gitignore
+
+# Python artifacts
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.egg-info/
+**/.pytest_cache/
+
+# Virtual environments
+agent/.venv/
+.venv/
+
+# Local case store (dev only — not for containers)
+agent/.cases/
+
+# Evaluation harness — not needed at runtime
+evals/
+
+# Secrets and local config
+.env
+agent/src/scheduling_agent/hosts/m365/.env
+
+# Editor and OS artifacts
+.vscode/
+.idea/
+**/.DS_Store
+**/Thumbs.db

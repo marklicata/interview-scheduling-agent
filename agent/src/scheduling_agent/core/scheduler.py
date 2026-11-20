@@ -468,7 +468,10 @@ class Engine:
         out = []
         for spec in self.specs:
             unknown = [p for p in spec.interviewers if p in self.av and self.av[p].coverage == "unknown"]
-            if len(spec.interviewers) < 2 and not unknown:
+            # Skip only if single-interviewer, no pool, and no unknown coverage.
+            # Pool sessions with pool_count > 0 can produce near-fits when fewer
+            # than the required number of pool members are available.
+            if len(spec.interviewers) < 2 and not spec.pool_count and not unknown:
                 continue
             cand_free = iv.intersect(self._free(self.cand), [(self.cons.not_before or -10 ** 12,
                                                                self.cons.not_after or 10 ** 12)])
@@ -487,6 +490,39 @@ class Engine:
                                 "end": iso(from_min(e, self.cons.day_time_zone)), "blocking_participant": blocker,
                                 "observed_status": status, "available": [self.cand] + others})
                     break
+            # Pool near-fits: slots where the candidate + required interviewers are free
+            # but fewer than pool_count pool members are available.
+            if spec.pool_count and spec.pool:
+                req_free = cand_free
+                for p in spec.interviewers:
+                    req_free = iv.intersect(req_free, self._free(p))
+                for s in self._starts(req_free, spec.duration_min, -10 ** 12, None)[:200]:
+                    e = s + spec.duration_min
+                    avail_pool = [
+                        p for p in spec.pool
+                        if p not in spec.interviewers and iv.contains(self._free(p), s, e)
+                    ]
+                    if len(avail_pool) >= spec.pool_count:
+                        break  # Enough pool members — full search would have found this; stop.
+                    for blocker in spec.pool:
+                        if blocker in spec.interviewers or iv.contains(self._free(blocker), s, e):
+                            continue
+                        a = self.av.get(blocker)
+                        status = a.status_at(s, e) if a else "unknown"
+                        out.append({
+                            "session_id": spec.session_id,
+                            "start": iso(from_min(s, self.cons.day_time_zone)),
+                            "end": iso(from_min(e, self.cons.day_time_zone)),
+                            "blocking_participant": blocker,
+                            "observed_status": status,
+                            "available": [self.cand] + list(spec.interviewers) + avail_pool,
+                            "pool_note": (
+                                f"Need {spec.pool_count} from pool; "
+                                f"{len(avail_pool)} available at this time"
+                            ),
+                        })
+                        break
+                    break  # Report only the first near-fit slot per pool spec
         out.sort(key=lambda x: (0 if x["observed_status"] == "tentative" else 1, x["start"]))
         return out[:limit]
 

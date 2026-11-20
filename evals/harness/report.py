@@ -112,6 +112,46 @@ def compute_metrics(records, gate_member) -> dict:
         "Action cases ending with exactly the expected effects, approvals, and truthful status / all action cases.")
     metrics["case_pass_rate"] = rate_metric("case_pass_rate", g, lambda r: True, _status_outcome, None,
                                             "Cases fully passing / cases with a determined outcome.")
+
+    # Per-attempt pass rate: flattens all repeat attempts into individual records.
+    # This is the primary tuning signal — it shows what the agent can do without being
+    # conflated with judge variance amplified by worst-of-N aggregation.
+    attempt_records = [
+        {"status": s}
+        for r in g
+        for s in (r.get("attempt_statuses") or [r["status"]])
+        if s in ("pass", "fail", "ungraded", "error")
+    ]
+    if attempt_records:
+        metrics["per_attempt_pass_rate"] = rate_metric(
+            "per_attempt_pass_rate", attempt_records,
+            lambda r: True, _status_outcome, None,
+            ("Individual attempt passes / total attempts across all repeats. Less noisy than worst-of-N; "
+             "use as the primary tuning signal. 95% here ≈ 86% worst-of-3."),
+        )
+
+    # Majority pass rate: a case passes if ≥ ⌈N/2⌉ of its attempts pass.
+    # Sits between per-attempt (lenient) and worst-of-N (strict).
+    majority_records = []
+    for r in g:
+        attempts = r.get("attempt_statuses") or [r["status"]]
+        n = len(attempts)
+        threshold = (n + 1) // 2  # ceil(N/2)
+        passed = sum(1 for s in attempts if s == "pass")
+        failed = sum(1 for s in attempts if s == "fail")
+        if passed >= threshold:
+            majority_records.append({"status": "pass"})
+        elif failed >= threshold:
+            majority_records.append({"status": "fail"})
+        else:
+            majority_records.append({"status": "ungraded"})
+    if majority_records:
+        metrics["majority_pass_rate"] = rate_metric(
+            "majority_pass_rate", majority_records,
+            lambda r: True, _status_outcome, None,
+            ("Cases where ≥ ⌈N/2⌉ attempts pass / all cases. Mid-point between per-attempt and worst-of-N; "
+             "less sensitive to single bad judge runs."),
+        )
     metrics["deterministic_pass_rate"] = rate_metric(
         "deterministic_pass_rate", g, lambda r: True, lambda r: not fl(r, "deterministic_failure"), None,
         "Cases with no deterministic check failure (text assertions not considered).")

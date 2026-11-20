@@ -415,7 +415,7 @@ def build_parser():
     r.add_argument("--baseline", help="results.json of the previous accepted run to compare against")
     r.add_argument("--fail-on-regression", action="store_true")
     r.add_argument("--repeats", type=int, default=1, help="attempts per case (worst attempt counts)")
-    r.add_argument("--workers", type=int, default=1, help="cases run in parallel")
+    r.add_argument("--workers", type=int, default=10, help="cases run in parallel")
     r.add_argument("--timeout-s", type=float, default=0.0, help="per-attempt agent timeout (0 = none)")
     r.add_argument("--calendar-delivery", choices=["tools", "inline"], default="tools")
     r.add_argument("--include-later-in-gate", action="store_true", help="gate on release_scope: later cases too")

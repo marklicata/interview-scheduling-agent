@@ -58,4 +58,29 @@ A scan of every oracle valid example confirms no expected schedule now places a 
 
 ## Open
 
-None.
+### 1. Pre-existing UTC offset errors blocking dataset rebuild (2026-11-16)
+
+16 cases use the wrong UTC offset for `America/Vancouver`, `America/Edmonton`, and
+`Africa/Casablanca`. These zones adopted new permanent offset rules reflected in the
+IANA tzdata that the validator uses:
+
+| Zone | Old offset (incorrect) | Correct offset |
+|---|---|---|
+| America/Vancouver | -08:00 (throughout) | -07:00 (BC adopted permanent PDT) |
+| America/Edmonton | -07:00 (throughout) | -06:00 (AB adopted permanent MDT) |
+| Africa/Casablanca | +01:00 | +00:00 (Moroccan DST schedule changed) |
+
+Affected cases: AUTH-017, AUTH-070, BAS-028, BAS-035, CHG-064, COM-007, COM-030,
+EXE-031, FMT-018, FMT-027, NLP-061, PNL-015, STY-011, STY-040, SUP-023, TZ-066.
+
+The cases test valid scheduling behaviors unrelated to timezone offsets. The fix is
+to update all ISO timestamps in these cases to use the correct UTC offset while
+keeping wall-clock times the same, then update the `expected_utc_offset` and
+`expected_local` fields in `local_time_checks`. Each case must be fixed individually
+(using `python3 -c "from zoneinfo import ZoneInfo; ..."` for each timestamp) to avoid
+collateral changes to other cases in the same file.
+
+**Merge blocker:** `python3 tools/merge_cases.py interview-scheduling-test-cases.yaml`
+will not write output until all 16 cases are corrected. New fragment files
+(`LTR-02.yaml`, `INF-03.yaml`) are already clean and pass validation independently;
+they will be included in the next successful rebuild.

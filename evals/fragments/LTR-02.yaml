@@ -1,0 +1,177 @@
+test_cases:
+  - id: LTR-039
+    title: Automated coding assessment (HackerRank) - no Outlook event needed, recruiter sends the link
+    category: later_scope_capabilities
+    subcategory: automated_assessment_platform
+    description: >-
+      The recruiter wants to send the candidate a HackerRank automated coding
+      assessment before the live technical interview. Online automated assessment
+      platforms (HackerRank, Codility, and similar) are outside the interview
+      scheduling scope: no Outlook calendar event is needed, and the recruiter
+      sends the test link directly. The agent must decline scheduling the platform
+      test and give the recruiter an owned next step, while still being able to
+      schedule the live follow-up interview. Tests that the agent distinguishes
+      async platform tests from live scheduled interviews.
+    difficulty: basic
+    severity: medium
+    release_scope: out_of_scope
+    interview_types: [technical_coding]
+    tags: [online_assessment, automated_platform, no_live_interviewer, out_of_scope, recruiter_owned_next_step, uk]
+    requirement_refs: [CON-12, COM-02]
+    source_inspiration: GTA use-cases doc section 5.6 - "Online technical screens stay with the scheduler"
+    inputs:
+      now: "2026-11-17T09:00:00+00:00"
+      recruiter: {id: rec_harriet, name: Harriet Osei, time_zone: Europe/London}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Yusuf Oduya
+        email: y.oduya@example.com
+        time_zone: Europe/London
+        availability:
+          - {start: "2026-11-19T10:00:00+00:00", end: "2026-11-19T16:00:00+00:00"}
+          - {start: "2026-11-20T09:00:00+00:00", end: "2026-11-20T13:00:00+00:00"}
+      interview_plan:
+        name: Fabrikam Backend Engineer - interview process
+        team: Fabrikam Platform Engineering
+        sessions:
+          - id: TECH
+            title: Live technical interview
+            format: virtual
+            duration_min: 60
+            interviewers: [int_priya]
+      interviewers:
+        - id: int_priya
+          name: Priya Nair
+          time_zone: Europe/London
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-19T10:00:00+00:00", end: "2026-11-19T11:30:00+00:00", status: busy}
+      conversation:
+        - role: recruiter
+          text: >-
+            Before Yusuf's technical interview with Priya, I want him to complete
+            a HackerRank coding assessment. Can you schedule that or send him the
+            link? Then set up the live interview with Priya.
+    expected:
+      disposition: decline_unsupported
+      secondary_dispositions: [propose_options]
+      solution_summary: >-
+        The HackerRank assessment is an automated platform test with no live
+        interviewer; no Outlook calendar event is needed. The recruiter sends the
+        platform link directly to Yusuf. Offer to draft the message. For the live
+        technical interview (TECH) with Priya, Thursday, November 19, 2026 is
+        available starting 11:30 a.m.-3:00 p.m. GMT (after Priya's morning block);
+        Friday, November 20 from 9:00 a.m. GMT also works.
+      must:
+        - Explain that the HackerRank step is an automated assessment with no live
+          interviewer and no Outlook event is needed.
+        - State that the recruiter sends the platform link directly to the candidate
+          and name that as the recruiter-owned next step.
+        - Offer to draft the message to send Yusuf the HackerRank link.
+        - Propose valid times for the live TECH interview with Priya separately.
+        - Ask whether to book one of the live interview options.
+      must_not:
+        - Create an Outlook calendar event for the HackerRank assessment.
+        - Treat the HackerRank step as a live technical coding interview that needs
+          an interviewer and a Teams link.
+        - Refuse to schedule the live TECH interview because the platform test is
+          out of scope.
+        - Book anything before explicit confirmation.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [whether to draft the HackerRank invitation message]
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-19T00:00:00+00:00", end: "2026-11-21T00:00:00+00:00"}
+      participants:
+        candidate:
+          time_zone: Europe/London
+          available:
+            - ["2026-11-19T10:00:00+00:00", "2026-11-19T16:00:00+00:00"]
+            - ["2026-11-20T09:00:00+00:00", "2026-11-20T13:00:00+00:00"]
+        int_priya:
+          time_zone: Europe/London
+          working_hours: {time_zone: Europe/London, days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          busy:
+            - ["2026-11-19T10:00:00+00:00", "2026-11-19T11:30:00+00:00"]
+      sessions:
+        - {id: TECH, duration_min: 60, attendees: [candidate, int_priya]}
+      expect_feasible: true
+      valid_examples:
+        - {TECH: "2026-11-19T11:30:00+00:00"}
+        - {TECH: "2026-11-20T09:00:00+00:00"}
+      invalid_examples:
+        - {TECH: "2026-11-19T10:00:00+00:00", note: Priya is busy until 11:30.}
+      valid_start_bounds:
+        TECH: {earliest: "2026-11-19T11:30:00+00:00", latest: "2026-11-20T12:00:00+00:00"}
+
+  - id: LTR-040
+    title: Pre-apply sourcing discovery call - no active application, recruiter owns the outreach
+    category: later_scope_capabilities
+    subcategory: pre_apply_sourcing_conversation
+    description: >-
+      A recruiter wants to schedule a 15-minute exploratory call with a passive
+      LinkedIn contact who has not yet applied to the role, to gauge interest before
+      a formal application. Pre-apply sourcing conversations are outside the interview
+      scheduling scope: the agent schedules formal interviews for active applicants
+      only, and there is no candidate record or application to associate the call with.
+      The recruiter owns reaching out directly. Tests that the agent correctly
+      identifies the absence of an active application and declines to schedule.
+    difficulty: basic
+    severity: medium
+    release_scope: out_of_scope
+    interview_types: [phone_screen]
+    tags: [pre_apply, sourcing_conversation, out_of_scope, recruiter_owned_next_step, netherlands]
+    requirement_refs: [INT-01, CON-12]
+    source_inspiration: GTA use-cases doc section 5.6 - "pre-apply sourcing conversations stay with the scheduler"
+    inputs:
+      now: "2026-11-17T10:00:00+01:00"
+      recruiter: {id: rec_fleur, name: Fleur van der Berg, time_zone: Europe/Amsterdam}
+      authority: {mode: confirm_each_action}
+      interview_plan:
+        name: Proseware Senior Data Scientist - sourcing
+        team: Proseware Analytics
+        sessions:
+          - id: DISC
+            title: Discovery call
+            format: phone
+            duration_min: 15
+            interviewers: [rec_fleur]
+      interviewers:
+        - id: rec_fleur
+          name: Fleur van der Berg
+          time_zone: Europe/Amsterdam
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:00", end: "17:00"}
+          calendar:
+            - {start: "2026-11-19T10:00:00+01:00", end: "2026-11-19T12:00:00+01:00", status: busy}
+      conversation:
+        - role: recruiter
+          text: >-
+            I found a great passive candidate on LinkedIn - Lars Eriksson, currently
+            at Woodgrove. He hasn't applied yet but I want to do a quick 15-min
+            discovery call to see if he's interested in the role. Can you schedule
+            that and reach out to him?
+    expected:
+      disposition: decline_unsupported
+      solution_summary: >-
+        Pre-apply sourcing conversations are outside the scheduling scope. Lars has
+        not applied and there is no active application to associate a schedule with.
+        The recruiter owns reaching out to Lars directly. Offer to draft the outreach
+        message for the recruiter to send. Once Lars applies and is in the formal
+        interview stage, scheduling can begin.
+      must:
+        - State that pre-apply sourcing calls are outside the scheduling scope and there
+          is no active application to associate with.
+        - Say the recruiter owns reaching out to Lars directly and name that as the
+          recruiter-owned next step.
+        - Offer to draft the outreach message for the recruiter to send.
+        - Not attempt to contact Lars Eriksson.
+      must_not:
+        - Contact or send any communication to Lars Eriksson.
+        - Create a calendar event or send any invitation to Lars.
+        - Treat this as a standard phone screen for a formal applicant with a candidate
+          record.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [whether to draft the outreach message for the recruiter to send]

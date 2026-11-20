@@ -9,6 +9,7 @@ The model proposes a write together with its authority basis. The gate never tru
   matches; booking authority never covers holds, publication, or messages unless the scope lists them;
 - a current "draft only / don't book / don't send" instruction blocks the write even with an active grant.
 """
+
 from __future__ import annotations
 
 import re
@@ -21,8 +22,12 @@ ACTING_ROLES = {"recruiter", "coordinator", "admin"}
 RESTRICTION = re.compile(
     r"\b(draft[- ]only|just (a )?draft|do ?n[o']?t (book|send|schedule|invite|change|cancel|touch)|"
     r"don't (book|send|schedule|invite|change|cancel)|not yet|hold off|wait before|no invites?|"
-    r"before (you|we) (book|send)|without booking)\b", re.I)
-NEGATION = re.compile(r"^\s*(no|nope|not|don'?t|do not|wait|hold|stop|cancel that)\b", re.I)
+    r"before (you|we) (book|send)|without booking)\b",
+    re.IGNORECASE,
+)
+NEGATION = re.compile(
+    r"^\s*(no|nope|not|don'?t|do not|wait|hold|stop|cancel that)\b", re.IGNORECASE
+)
 
 # Words that approve an action. After the agent has displayed a proposal, an affirmation or the action's own verb
 # approves it ("Yes", "Sim, book it", "네, book it"). Without a displayed proposal, only the action's own verb counts
@@ -31,18 +36,27 @@ NEGATION = re.compile(r"^\s*(no|nope|not|don'?t|do not|wait|hold|stop|cancel tha
 AFFIRM = re.compile(
     r"\b(yes|yep|yeah|yup|sure|ok|okay|go ahead|please do|do (it|both|that|those|them|all)|confirm(ed)?|"
     r"approved?|that works|perfect)\b|"
-    r"^\W*(sim|s[ií]|oui|ja|da|tak|はい|네|예|是的|好的?|ok)(\W|$)", re.I)
+    r"^\W*(sim|s[ií]|oui|ja|da|tak|はい|네|예|是的|好的?|ok)(\W|$)",
+    re.IGNORECASE,
+)
 ACTION_VERBS = {
-    "book": re.compile(r"\b(book|send (the |an |out )?(invite|invitation)s?|send it|invite|lock (it )?in|"
-                       r"grab (the|that|it))", re.I),
-    "reschedule": re.compile(r"\b(move|reschedule|shift|push|change|update|book|send it)\b", re.I),
-    "cancel": re.compile(r"\b(cancel|withdraw|call off)", re.I),
-    "send_message": re.compile(r"\b(send|email|e-mail|tell|let \w+ know|notify|message|reply|forward)\b", re.I),
-    "hold": re.compile(r"\bhold", re.I),
-    "publish": re.compile(r"\bpublish", re.I),
+    "book": re.compile(
+        r"\b(book|send (the |an |out )?(invite|invitation)s?|send it|invite|lock (it )?in|"
+        r"grab (the|that|it))",
+        re.IGNORECASE,
+    ),
+    "reschedule": re.compile(
+        r"\b(move|reschedule|shift|push|change|update|book|send it)\b", re.IGNORECASE
+    ),
+    "cancel": re.compile(r"\b(cancel|withdraw|call off)", re.IGNORECASE),
+    "send_message": re.compile(
+        r"\b(send|email|e-mail|tell|let \w+ know|notify|message|reply|forward)\b", re.IGNORECASE
+    ),
+    "hold": re.compile(r"\bhold", re.IGNORECASE),
+    "publish": re.compile(r"\bpublish", re.IGNORECASE),
 }
-GO_AHEAD = re.compile(r"\b(go ahead|book|move|reschedule|cancel|send)\b", re.I)
-DRAFT_ONLY = re.compile(r"draft[- ]only|just (a )?draft", re.I)
+GO_AHEAD = re.compile(r"\b(go ahead|book|move|reschedule|cancel|send)\b", re.IGNORECASE)
+DRAFT_ONLY = re.compile(r"draft[- ]only|just (a )?draft", re.IGNORECASE)
 
 ACTION_SYNONYMS = {
     "book": {"book", "create", "schedule", "booking", "create_event", "invite"},
@@ -71,7 +85,9 @@ class WriteGate:
     def __init__(self, inputs: dict, now):
         self.inputs = inputs
         self.authority = inputs.get("authority") or {}
-        self.conversation = [t for t in inputs.get("conversation") or [] if isinstance(t, dict)]
+        self.conversation = [
+            t for t in inputs.get("conversation") or [] if isinstance(t, dict)
+        ]
         self.now = now
         self.recruiter_id = str((inputs.get("recruiter") or {}).get("id") or "")
         self.recruiter_name = _norm((inputs.get("recruiter") or {}).get("name"))
@@ -81,20 +97,38 @@ class WriteGate:
     def _delegate_roles(inputs: dict) -> set:
         """Conversation roles that policy explicitly lets confirm bookings for this case (may_confirm_bookings)."""
         roles = set()
-        acting = inputs.get("acting_user") if isinstance(inputs.get("acting_user"), dict) else {}
+        acting = (
+            inputs.get("acting_user")
+            if isinstance(inputs.get("acting_user"), dict)
+            else {}
+        )
         pol = inputs.get("policies") if isinstance(inputs.get("policies"), dict) else {}
-        for key in ("case_delegates", "case_collaborators", "delegates", "collaborators"):
+        for key in (
+            "case_delegates",
+            "case_collaborators",
+            "delegates",
+            "collaborators",
+        ):
             groups = pol.get(key)
-            entries = [e for grp in (groups.values() if isinstance(groups, dict) else [groups or []])
-                       for e in (grp if isinstance(grp, list) else [grp]) if isinstance(e, dict)]
+            entries = [
+                e
+                for grp in (
+                    groups.values() if isinstance(groups, dict) else [groups or []]
+                )
+                for e in (grp if isinstance(grp, list) else [grp])
+                if isinstance(e, dict)
+            ]
             for e in entries:
                 if e.get("may_confirm_bookings") is not True:
                     continue
                 if e.get("role"):
                     roles.add(_norm(e["role"]).replace(" ", "_"))
                 if acting and str(e.get("user")) == str(acting.get("id")):
-                    roles.add("assistant_ea" if "assistant" in _norm(acting.get("role")) else
-                              _norm(acting.get("role")).replace(" ", "_"))
+                    roles.add(
+                        "assistant_ea"
+                        if "assistant" in _norm(acting.get("role"))
+                        else _norm(acting.get("role")).replace(" ", "_")
+                    )
         return roles
 
     # ------------------------------------------------------------------ helpers
@@ -107,7 +141,7 @@ class WriteGate:
 
     def current_restriction(self) -> str | None:
         """A draft-only/don't-book instruction from the acting user after the last agent turn."""
-        for t in self.conversation[self._last_agent_index() + 1:]:
+        for t in self.conversation[self._last_agent_index() + 1 :]:
             text = str(t.get("text") or "")
             if t.get("role") in ACTING_ROLES and RESTRICTION.search(text):
                 # "Go ahead with the S2 move. Hold off on S4" approves one thing and restricts another: the model
@@ -124,29 +158,43 @@ class WriteGate:
         return g if isinstance(g, dict) else None
 
     # ------------------------------------------------------------------ decision
-    def check(self, method: str, basis: dict | None, start=None, organizer=None) -> GateDecision:
+    def check(
+        self, method: str, basis: dict | None, start=None, organizer=None
+    ) -> GateDecision:
         action = WRITE_METHODS.get(method)
         if action is None:
             return GateDecision(False, f"{method} is not a write this agent performs")
         mode = self.authority.get("mode")
         if mode == "read_only_user":
-            return GateDecision(False, "the acting user is read-only; no writes are possible. Hand off to someone "
-                                       "with write access.")
+            return GateDecision(
+                False,
+                "the acting user is read-only; no writes are possible. Hand off to someone "
+                "with write access.",
+            )
         basis = basis or {}
         kind = basis.get("type")
         restriction = self.current_restriction()
         if restriction:
-            return GateDecision(False, f"the user's current instruction restricts actions: {restriction!r}")
+            return GateDecision(
+                False,
+                f"the user's current instruction restricts actions: {restriction!r}",
+            )
         if kind == "grant":
             return self._check_grant(action, start, organizer)
         if kind == "confirmation":
             return self._check_confirmation(action, basis)
-        return GateDecision(False, "no authority basis given; propose the action and ask for confirmation")
+        return GateDecision(
+            False,
+            "no authority basis given; propose the action and ask for confirmation",
+        )
 
     def _check_grant(self, action, start, organizer) -> GateDecision:
         g = self._grant()
         if g is None:
-            return GateDecision(False, f"no active autonomous grant (authority mode {self.authority.get('mode')!r})")
+            return GateDecision(
+                False,
+                f"no active autonomous grant (authority mode {self.authority.get('mode')!r})",
+            )
         if str(g.get("status", "active")).lower() not in ("active", ""):
             return GateDecision(False, f"grant status is {g.get('status')!r}")
         exp = try_parse_ts(g.get("expires"))
@@ -154,25 +202,50 @@ class WriteGate:
             return GateDecision(False, "the autonomous grant has expired")
         scope = g.get("scope") or {}
         actions = {str(a).lower() for a in scope.get("actions") or []}
-        allowed = {a for a in actions for k, syn in ACTION_SYNONYMS.items() if a in syn and k == action}
+        allowed = {
+            a
+            for a in actions
+            for k, syn in ACTION_SYNONYMS.items()
+            if a in syn and k == action
+        }
         if not allowed:
-            return GateDecision(False, f"the grant covers {sorted(actions)}, not {action}")
+            return GateDecision(
+                False, f"the grant covers {sorted(actions)}, not {action}"
+            )
         dr = scope.get("date_range") or {}
-        ds, de, st = try_parse_ts(dr.get("start")), try_parse_ts(dr.get("end")), try_parse_ts(start)
+        ds, de, st = (
+            try_parse_ts(dr.get("start")),
+            try_parse_ts(dr.get("end")),
+            try_parse_ts(start),
+        )
         if st is not None and ((ds and st < ds) or (de and st >= de)):
-            return GateDecision(False, "the event date is outside the grant's date range")
-        named = " ".join(str(scope.get(k) or "") for k in ("case", "candidate", "candidates"))
+            return GateDecision(
+                False, "the event date is outside the grant's date range"
+            )
+        named = " ".join(
+            str(scope.get(k) or "") for k in ("case", "candidate", "candidates")
+        )
         cand = _norm((self.inputs.get("candidate") or {}).get("name"))
         # "all candidates" or "all" in the scope means no specific candidate restriction
         _named_norm = _norm(named)
         _covers_all = "all candidates" in _named_norm or _named_norm.startswith("all ")
-        if named.strip() and cand and not _covers_all and cand.split()[0] not in _named_norm:
-            return GateDecision(False, f"the grant is scoped to {named.strip()!r}, not this candidate")
+        if (
+            named.strip()
+            and cand
+            and not _covers_all
+            and cand.split()[0] not in _named_norm
+        ):
+            return GateDecision(
+                False, f"the grant is scoped to {named.strip()!r}, not this candidate"
+            )
         org = scope.get("organizer")
         if org and organizer and _norm(org) != _norm(organizer):
             return GateDecision(False, f"the grant requires organizer {org}")
-        return GateDecision(True, f"covered by the active {g.get('route', 'configured')} grant "
-                                  f"({sorted(actions)})")
+        return GateDecision(
+            True,
+            f"covered by the active {g.get('route', 'configured')} grant "
+            f"({sorted(actions)})",
+        )
 
     def _check_confirmation(self, action, basis) -> GateDecision:
         try:
@@ -184,30 +257,86 @@ class WriteGate:
         turn = self.conversation[i]
         role = turn.get("role")
         text = str(turn.get("text") or "")
-        ui_approval = (role == "system" and _norm(text).startswith("ui event") and self.recruiter_name
-                       and self.recruiter_name in _norm(text) and re.search(r"approve|book|confirm", text, re.I))
+        ui_approval = (
+            role == "system"
+            and _norm(text).startswith("ui event")
+            and self.recruiter_name
+            and self.recruiter_name in _norm(text)
+            and re.search(r"approve|book|confirm", text, re.IGNORECASE)
+        )
         delegated = role in self.delegate_roles and action in ("book", "reschedule")
         if role not in ACTING_ROLES and not ui_approval and not delegated:
-            return GateDecision(False, f"turn {i} is from {role!r}; only the acting recruiter/coordinator (or a "
-                                       "delegate that policy allows to confirm bookings) can authorize actions")
+            return GateDecision(
+                False,
+                f"turn {i} is from {role!r}; only the acting recruiter/coordinator (or a "
+                "delegate that policy allows to confirm bookings) can authorize actions",
+            )
         if i < self._last_agent_index():
-            return GateDecision(False, f"turn {i} precedes the latest agent turn; a confirmation must answer the "
-                                       "current proposal")
+            return GateDecision(
+                False,
+                f"turn {i} precedes the latest agent turn; a confirmation must answer the "
+                "current proposal",
+            )
         quote = _norm(basis.get("quote"))
         if not quote or quote not in _norm(text):
-            return GateDecision(False, f"the quoted confirmation does not appear in turn {i}")
+            return GateDecision(
+                False, f"the quoted confirmation does not appear in turn {i}"
+            )
         if NEGATION.search(text):
-            return GateDecision(False, f"turn {i} reads as a refusal or hold, not a confirmation")
+            return GateDecision(
+                False, f"turn {i} reads as a refusal or hold, not a confirmation"
+            )
         verb = ACTION_VERBS.get(action)
         if ui_approval:
-            return GateDecision(True, f"approved in the product UI by the acting recruiter (turn {i})")
+            return GateDecision(
+                True, f"approved in the product UI by the acting recruiter (turn {i})"
+            )
         if action in ("hold", "publish") or not self._agent_before(i):
             if verb is None or not verb.search(text):
-                return GateDecision(False, f"turn {i} does not explicitly ask to {action}. Show the exact action and "
-                                           "ask for confirmation first.")
+                return GateDecision(
+                    False,
+                    f"turn {i} does not explicitly ask to {action}. Show the exact action and "
+                    "ask for confirmation first.",
+                )
         elif not (AFFIRM.search(text) or (verb is not None and verb.search(text))):
-            return GateDecision(False, f"turn {i} does not approve the proposed {action}")
+            return GateDecision(
+                False, f"turn {i} does not approve the proposed {action}"
+            )
         return GateDecision(True, f"explicitly confirmed by the {role} in turn {i}")
+
+    def find_approval(self) -> dict | None:
+        """Most recent booking approval from the acting user after the last agent turn."""
+        if self.current_restriction():
+            return None
+        last_agent = self._last_agent_index()
+        reschedule_re = re.compile(r"\b(move|reschedule|push to|change to)\b", re.IGNORECASE)
+        for i in range(len(self.conversation) - 1, last_agent, -1):
+            turn = self.conversation[i]
+            text = str(turn.get("text") or "")
+            if not text or turn.get("role") not in ACTING_ROLES:
+                continue
+            if NEGATION.search(text):
+                continue
+            for action in ("book", "cancel"):
+                m = ACTION_VERBS[action].search(text)
+                if m:
+                    return {
+                        "type": "confirmation",
+                        "turn_index": i,
+                        "quote": m.group(0),
+                    }
+            m = reschedule_re.search(text)
+            if m:
+                return {"type": "confirmation", "turn_index": i, "quote": m.group(0)}
+            if self._agent_before(i):
+                m = AFFIRM.search(text)
+                if m:
+                    return {
+                        "type": "confirmation",
+                        "turn_index": i,
+                        "quote": m.group(0),
+                    }
+        return None
 
     def _agent_before(self, i: int) -> bool:
         return any(t.get("role") == "agent" for t in self.conversation[:i])

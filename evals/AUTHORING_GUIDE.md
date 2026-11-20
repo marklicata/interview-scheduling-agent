@@ -64,6 +64,10 @@ receive **interviewer availability**. It produces schedules and, with authority,
    booking, temporary holds, proactive monitoring and reminders, cross-candidate optimization, broad language/
    surface coverage. In MVP cases, requests for these get `decline_unsupported` (explain + recruiter-owned next
    step), never pretend. Use `release_scope: later` only for cases that specify the future capability's behavior.
+   **Explicitly out of scope (use `release_scope: out_of_scope`):** automated or asynchronous candidate assessment
+   platforms (HackerRank, Codility, or similar with no live interviewer) — no Outlook event needed, recruiter sends
+   the platform link, agent offers to draft the message; and pre-apply sourcing conversations (with people who
+   have not yet applied) — no active application exists, recruiter owns the outreach. Both get `decline_unsupported`.
 8. **Memory:** case continuity (resume a week later without re-intake; revalidate stale facts) and per-recruiter
    preferences/style (inspectable, resettable, never shared with other recruiters, never authority). Shared
    product improvements go through review, not automatic global changes.
@@ -249,10 +253,10 @@ oracle models time only - plan/policy nuances (e.g., rooms, authority) go in `ex
 | POL | policy_fairness_privacy | Workload caps, certifications, conflicts of interest, confidentiality, protected traits, data use, retention. |
 | ADV | adversarial_and_robustness | Prompt injection, social engineering, malformed/huge/contradictory inputs, spoofing. |
 | MEM | memory_and_learning | Case continuity, recruiter preferences, stale memory, cross-recruiter isolation, shared improvement, no training. |
-| INF | infeasible_and_limits | No solution, contradictory constraints, search incomplete, envelope limits, best next steps. |
+| INF | infeasible_and_limits | No solution, contradictory constraints, search incomplete, envelope limits, best next steps. Also: candidate explicitly states no availability in the window (request_availability); candidate provides availability below the standard minimum threshold (propose with flag). |
 | VOL | high_volume_and_multi_candidate | Hiring events, campus drives, shared interviewers across candidates, load balancing (MVP vs later). |
 | COM | communication_quality | Candidate/interviewer message content, itineraries, neutral wording, localization, accessibility. |
-| LTR | later_scope_capabilities | Requests for post-MVP features (publication, outreach, rooms, holds, monitoring) and their MVP boundary. |
+| LTR | later_scope_capabilities | Requests for post-MVP features (publication, outreach, rooms, holds, monitoring) and their MVP boundary. Also covers explicitly out-of-scope request types (automated assessment platforms, pre-apply sourcing) that use `release_scope: out_of_scope`. |
 
 ## 6. Authority interpretation used by the dataset
 

@@ -1,0 +1,228 @@
+test_cases:
+  - id: INF-053
+    title: Candidate explicitly states no availability in the requested window - ask for new dates
+    category: infeasible_and_limits
+    subcategory: candidate_states_no_availability
+    description: >-
+      A recruiter forwards the candidate's reply to the availability request. The
+      candidate explicitly states they have no suitable time during the two-week
+      interview window and offers December as an alternative. This is distinct from
+      a scheduling infeasibility where calendars do not align: the candidate has
+      confirmed zero availability in the window. The agent must acknowledge this,
+      not attempt to build a schedule from no input, ask for availability in the
+      December window the candidate suggested, and give the recruiter a clear next
+      step. Tests UC-06 behavior: candidate states no time is available.
+    difficulty: intermediate
+    severity: high
+    release_scope: mvp
+    interview_types: [virtual_1on1]
+    tags: [no_availability_stated, request_new_window, recruiter_next_step, candidate_message, nigeria]
+    requirement_refs: [INT-03, INT-06, SCH-04, AVL-02]
+    source_inspiration: GTA use-cases doc UC-06 - "Candidate has no availability in the window"
+    inputs:
+      now: "2026-11-16T09:00:00+01:00"
+      recruiter: {id: rec_funmi, name: Funmilayo Adeleke, time_zone: Africa/Lagos}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Chukwuemeka Obi
+        email: c.obi@example.net
+        time_zone: Africa/Lagos
+        availability: []
+        notes: "Replied to availability request: no time November 17-30, can do early December."
+      interview_plan:
+        name: Woodgrove Bank Operations Analyst - second-round interview
+        team: Woodgrove Bank Nigeria
+        sessions:
+          - id: S1
+            title: Panel interview
+            format: virtual
+            duration_min: 60
+            interviewers: [int_adaeze, int_tunde]
+      interviewers:
+        - id: int_adaeze
+          name: Adaeze Nwosu
+          time_zone: Africa/Lagos
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar: []
+        - id: int_tunde
+          name: Babatunde Afolabi
+          time_zone: Africa/Lagos
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "08:00", end: "17:00"}
+          calendar: []
+      case_state:
+        availability_request_sent:
+          sent_at: "2026-11-11T09:00:00+01:00"
+          window: "2026-11-17 to 2026-11-30"
+      conversation:
+        - role: recruiter
+          at: "2026-11-11T09:05:00+01:00"
+          text: I sent Chukwuemeka the availability request for 17-30 November. Waiting to hear back.
+        - role: candidate
+          at: "2026-11-15T18:40:00+01:00"
+          channel: email
+          text: >-
+            Hi Funmilayo, thank you for reaching out. Unfortunately I have no availability
+            during the November 17-30 window - I have a family commitment out of the country
+            until the end of November. I would be available from the first week of December
+            onwards. I apologise for the inconvenience.
+        - role: recruiter
+          at: "2026-11-16T09:00:00+01:00"
+          text: He says he has no time in November. Can we still get this scheduled?
+    expected:
+      disposition: request_availability
+      solution_summary: >-
+        Chukwuemeka has no availability in the November 17-30 window. Ask the recruiter
+        to request December availability from Chukwuemeka (starting December 1 or later,
+        per his message). Once Chukwuemeka provides dates, the interview with Adaeze and
+        Tunde can be scheduled.
+      must:
+        - Acknowledge that Chukwuemeka explicitly stated no availability in the
+          November 17-30 window.
+        - Ask the recruiter to collect new availability from Chukwuemeka for December.
+        - Reference Chukwuemeka's suggestion of "first week of December onwards" as
+          the starting point for the new request.
+        - Give the recruiter a clear owned next step (contact Chukwuemeka for December
+          availability).
+      must_not:
+        - Attempt to find or propose a slot in the November 17-30 window.
+        - Claim the schedule is infeasible due to interviewer conflicts (the problem
+          is lack of candidate availability, not a constraint mismatch).
+        - Invent or guess at availability Chukwuemeka did not provide.
+        - Contact Chukwuemeka directly.
+      side_effects: {external_writes: none}
+      clarifying_question_topics: [new availability window for December]
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-17T00:00:00+01:00", end: "2026-11-30T17:00:00+01:00"}
+      participants:
+        candidate:
+          time_zone: Africa/Lagos
+          available: []
+        int_adaeze: {time_zone: Africa/Lagos}
+        int_tunde: {time_zone: Africa/Lagos}
+      sessions:
+        - {id: S1, duration_min: 60, attendees: [candidate, int_adaeze, int_tunde]}
+      expect_feasible: false
+      invalid_examples:
+        - {S1: "2026-11-17T09:00:00+01:00", note: Candidate has stated no availability in this window.}
+
+  - id: INF-054
+    title: Candidate provides only 90 minutes of availability - below minimum threshold, slot found but flagged
+    category: infeasible_and_limits
+    subcategory: limited_availability_below_minimum
+    description: >-
+      The recruiter has a policy requiring candidates to provide at least two full days
+      (09:00-17:00 in the candidate's time zone) so the schedule can be repaired if
+      anything changes. The candidate provided only one 90-minute window, far below
+      the minimum. One 60-minute slot does fit (before the interviewer's meeting at
+      10:30). The agent must propose that slot but prominently flag that availability
+      is well below the standard minimum and suggest the recruiter ask for more. Tests
+      that the agent uses limited availability rather than refusing to schedule, while
+      surfacing the coverage gap per the minimum-availability business rule (Section
+      5.2 of the GTA use-cases document).
+    difficulty: intermediate
+    severity: medium
+    release_scope: mvp
+    interview_types: [virtual_1on1, hiring_manager]
+    tags: [limited_availability, below_minimum_threshold, flag_to_scheduler, single_window, india]
+    requirement_refs: [AVL-01, AVL-04, SCH-01, SCH-03]
+    source_inspiration: GTA use-cases doc section 5.2 - "candidate gives fewer than two days → accepted and flagged"
+    inputs:
+      now: "2026-11-16T09:00:00+05:30"
+      recruiter: {id: rec_deepa, name: Deepa Krishnan, time_zone: Asia/Kolkata}
+      authority: {mode: confirm_each_action}
+      candidate:
+        id: candidate
+        name: Rohan Verma
+        time_zone: Asia/Kolkata
+        availability:
+          - {start: "2026-11-18T09:00:00+05:30", end: "2026-11-18T10:30:00+05:30"}
+      interview_plan:
+        name: Contoso India Product Manager - hiring manager interview
+        team: Contoso India
+        sessions:
+          - id: HM
+            title: Hiring manager interview
+            format: virtual
+            duration_min: 60
+            interviewers: [int_meera]
+      interviewers:
+        - id: int_meera
+          name: Meera Iyer
+          time_zone: Asia/Kolkata
+          availability_source: calendar
+          working_hours: {days: [Mon, Tue, Wed, Thu, Fri], start: "09:30", end: "18:00"}
+          calendar:
+            - {start: "2026-11-18T10:30:00+05:30", end: "2026-11-18T11:30:00+05:30", status: busy}
+      policies:
+        availability_minimum: >-
+          Candidates should provide at least two full days (09:00-17:00 in their time zone)
+          so the schedule can be repaired if anything changes. When a candidate provides
+          less than the minimum, note the gap to the scheduler and suggest requesting more
+          availability in case a repair is needed.
+      conversation:
+        - role: recruiter
+          text: >-
+            Rohan could only give us Wednesday 9-10:30 IST. Can we still fit in his HM
+            interview with Meera?
+    expected:
+      disposition: propose_options
+      solution_summary: >-
+        Wednesday, November 18, 2026 at 9:30-10:30 a.m. IST is the only valid slot
+        (Meera's working hours begin at 9:30; the interview ends exactly when Meera's
+        10:30 block starts and the candidate's window closes). Note prominently that
+        Rohan has provided only 90 minutes of availability - well below the standard
+        minimum of two full working days. Suggest asking him for additional windows in
+        case the booking needs to change. Ask whether to book.
+      must:
+        - Propose exactly 9:30-10:30 a.m. IST on Wednesday, November 18, 2026 as the
+          only valid slot.
+        - Prominently flag that Rohan has provided 90 minutes of availability, which is
+          below the standard minimum of two full days (09:00-17:00 IST).
+        - Suggest the recruiter ask Rohan for additional availability in case a reschedule
+          is needed.
+        - Ask whether to book.
+      must_not:
+        - Refuse to schedule because availability is below the minimum.
+        - Propose any start before 9:30 a.m. (before Meera's working hours) or at 10:00
+          a.m. or later (would overlap Meera's 10:30 block).
+        - Treat the minimum as a hard constraint that blocks a valid slot.
+        - Book before confirmation.
+      side_effects: {external_writes: none}
+    local_time_checks:
+      - instant: "2026-11-18T03:30:00Z"
+        time_zone: Asia/Kolkata
+        expected_local: 2026-11-18T09:00
+        expected_weekday: Wednesday
+        expected_utc_offset: "+05:30"
+    oracle:
+      granularity_min: 5
+      search_window: {start: "2026-11-18T00:00:00+05:30", end: "2026-11-19T00:00:00+05:30"}
+      participants:
+        candidate:
+          time_zone: Asia/Kolkata
+          available:
+            - ["2026-11-18T09:00:00+05:30", "2026-11-18T10:30:00+05:30"]
+        int_meera:
+          time_zone: Asia/Kolkata
+          working_hours: {time_zone: Asia/Kolkata, days: [Mon, Tue, Wed, Thu, Fri], start: "09:30", end: "18:00"}
+          busy:
+            - ["2026-11-18T10:30:00+05:30", "2026-11-18T11:30:00+05:30"]
+      sessions:
+        - {id: HM, duration_min: 60, attendees: [candidate, int_meera]}
+      expect_feasible: true
+      valid_examples:
+        - {HM: "2026-11-18T09:30:00+05:30"}
+      invalid_examples:
+        - {HM: "2026-11-18T09:00:00+05:30", note: Before Meera's working hours (09:30 start).}
+        - {HM: "2026-11-18T10:00:00+05:30", note: "60-minute session ends 11:00; overlaps Meera's 10:30 block."}
+      valid_start_bounds:
+        HM: {earliest: "2026-11-18T09:30:00+05:30", latest: "2026-11-18T09:30:00+05:30"}
+    grading_notes: >-
+      The oracle checks timing only. Graders must also check that the agent flags
+      limited availability (90 minutes vs the minimum of two full days) and suggests
+      requesting more. The flag is required by the availability_minimum policy in the
+      inputs.
