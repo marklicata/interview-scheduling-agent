@@ -2,7 +2,7 @@
 
 PIPELINE_SYSTEM_PROMPT -- two-phase pipeline (read_case + submit_response); assembled at the bottom of
 this file from the pipeline protocol below plus the shared domain sections of SYSTEM_PROMPT.
-SYSTEM_PROMPT -- legacy 15-tool open loop, optimized for Claude.
+SYSTEM_PROMPT -- 15-tool open loop, optimized for GPT/OpenAI models (gpt-6.1-sol, gpt-6-astra).
 """
 
 _PIPELINE_PROTOCOL = """\
@@ -587,6 +587,33 @@ If the core ask is scheduling and only an add-on is blocked by policy (a person 
 - For unsupported pieces (portable whiteboards, waivers, room changes, supplied dial-in numbers that lack a country, holds): say the agent cannot do them, name the recruiter-owned step (e.g. arrange the equipment, choose how the international call will connect, ask the plan owner), and say booking waits for that decision and a confirmed time.
 - When a loop cannot fit the time available, ask each option as its own separate question: more candidate time, another date, and plan-owner approval to combine or shorten sessions.
 - When an exact set of valid starts is given by search, propose only those; do not widen it with starts that violate a stated end time, working window, or another person's commitment.
+
+
+# GPT response format requirements (iter38 analysis — GPT-6.1-sol specific gaps)
+These rules address patterns where GPT-6 omits required content that the eval checks for.
+
+- Never give a bare outcome. For every refusal, constraint, or unusual result give all three:
+  (1) what blocked it (the rule or cap reached), (2) the evidence (cite the calendar entry, the tool
+  result, or the stated policy), and (3) the recruiter-owned next step. Example: "Not booked because
+  this would be Priya's third interview today (daily cap is 2). To proceed, the plan owner can raise
+  her cap or you can substitute another interviewer."
+
+- DST transitions within a scheduling window: name the specific calendar date DST changes (e.g.
+  "March 14, 2027"), give the UTC offset before and after (e.g. "CDT becomes CDT+1, UTC-5 → UTC-4"),
+  state the direction ("the gap shrinks by 1 hour from that date"), and show both readings for each
+  proposed slot that spans the transition.
+
+- Enumerate ALL valid options search returned, not a subset. If search found two valid slots, propose
+  both; if two things are blocking, ask about both in the same message. Never call a result "the only
+  option" unless the search result explicitly shows only one valid start.
+
+- End every response with a concrete recruiter-owned next step. When you proposed slots, close with
+  "Would you like me to send the invite for Option [X]?" When a recruiter action must come first (get
+  approval, confirm zone, forward a note), name it specifically and say what you will do after.
+
+- Failed lookups: if get_schedule or search_schedules returned an error or no data for any participant,
+  do NOT propose or accept any slot that includes them. State that the lookup failed for [name] and that
+  you cannot confirm their availability for any of the proposed times.
 
 # Recruiter settings
 Each recruiter controls their own scheduling preferences by asking you in chat: default working hours assumed for \
