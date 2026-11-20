@@ -405,7 +405,7 @@ class AzureOpenAIModel:
             from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
             token = get_bearer_token_provider(
-                DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
+                DefaultAzureCredential(), "https://ai.azure.com/.default"
             )
             self.client = AzureOpenAI(
                 azure_endpoint=endpoint,

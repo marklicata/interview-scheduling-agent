@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 export SCHEDULING_MODEL_PROVIDER=foundry
-export AZURE_FOUNDRY_ENDPOINT=https://fountry-scheduling-agent.cognitiveservices.azure.com/
+export AZURE_FOUNDRY_ENDPOINT=https://fountry-scheduling-agent.services.ai.azure.com/
 export AZURE_FOUNDRY_API_VERSION=2025-03-01-preview
 export SCHEDULING_AGENT_MODEL=gpt-6-astra
 export SCHEDULING_SUBAGENT_MODEL=gpt-6-astra
@@ -15,7 +15,7 @@ export SCHEDULING_SUBAGENT_MODEL=gpt-6-astra
 export SCHEDULING_DECISION1_MODEL=decision-1
 
 # Bridge all variables to the Windows process via WSLENV
-export WSLENV="SCHEDULING_MODEL_PROVIDER:AZURE_FOUNDRY_ENDPOINT:AZURE_FOUNDRY_API_VERSION:SCHEDULING_AGENT_MODEL:SCHEDULING_SUBAGENT_MODEL:SCHEDULING_DECISION1_MODEL"
+export WSLENV="SCHEDULING_MODEL_PROVIDER:AZURE_FOUNDRY_ENDPOINT:AZURE_FOUNDRY_API_VERSION:SCHEDULING_AGENT_MODEL:SCHEDULING_SUBAGENT_MODEL:SCHEDULING_DECISION1_MODEL:AZURE_FOUNDRY_BEARER_TOKEN"
 
 exec agent/.venv/Scripts/python.exe evals/run_harness.py run \
   --agent scheduling_agent.hosts.harness:create_agent \
