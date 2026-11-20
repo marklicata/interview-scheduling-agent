@@ -574,6 +574,99 @@ OVERRIDE_REASONS = {
 }
 
 
+def _rubric_items(disposition: str, n_opts: int, assumptions: list) -> list:
+    """Per-disposition required-content checklist for the D1 rubric check.
+
+    Returns yes/no factual statements that decision1.grade_checklist() evaluates.
+    Every item should be a concrete fact the message either contains or doesn't.
+    """
+    items = []
+
+    if disposition == "propose_options":
+        items.append(
+            f"The message presents {max(1, n_opts)} schedule option(s) with specific dates and times"
+        )
+        items.append("The message states the times are not yet reserved or confirmed")
+        items.append(
+            "The message asks the recruiter to choose an option or confirm one to book"
+        )
+
+    elif disposition == "report_infeasible":
+        items.append(
+            "The message explains specifically why no valid schedule exists "
+            "(names who is unavailable, which constraint is violated, or what is missing)"
+        )
+        items.append(
+            "The message suggests a concrete path forward "
+            "(more availability, exception approval, constraint relaxation, or substitution)"
+        )
+
+    elif disposition == "conditional_handoff":
+        items.append(
+            "The message explains what condition must be met and who the recruiter must contact"
+        )
+        items.append(
+            "The message gives the recruiter a specific action to take (who to ask, what to ask for)"
+        )
+
+    elif disposition == "ask_clarification":
+        items.append(
+            "The message asks a specific, focused clarifying question (not a vague request for more info)"
+        )
+
+    elif disposition in ("book", "reschedule"):
+        items.append(
+            "The message confirms what was booked or rescheduled and states that invitations have been sent"
+        )
+
+    elif disposition == "cancel":
+        items.append(
+            "The message confirms what was cancelled and states that cancellation notices will be sent to attendees"
+        )
+
+    elif disposition == "request_availability":
+        items.append(
+            "The message requests availability from a specific person for a specific date range or purpose"
+        )
+
+    elif disposition == "escalate":
+        items.append(
+            "The message names the specific person or authority who must act and what they need to do"
+        )
+
+    # Universal: blocking dispositions must name the specific blocker
+    if disposition not in (
+        "book",
+        "reschedule",
+        "cancel",
+        "acknowledge_and_record",
+        "update_memory",
+        "propose_options",
+    ):
+        items.append(
+            "The message names the specific blocker "
+            "(person, rule, missing information, or failed lookup) preventing progress"
+        )
+
+    # Universal: non-trivial dispositions must give a recruiter-owned next step
+    if disposition not in (
+        "book",
+        "reschedule",
+        "acknowledge_and_record",
+        "update_memory",
+    ):
+        items.append(
+            "The message gives the recruiter a concrete next step "
+            "(what to do, who to contact, or what to decide)"
+        )
+
+    # Disclose significant assumptions
+    for a in (assumptions or [])[:2]:
+        items.append(f"The message discloses the assumption: {a}")
+
+    return items
+
+
 class Toolbox:
     def __init__(self, inputs: dict, provider, policy: FallbackPolicy | None = None):
         self.inputs = inputs
@@ -1774,28 +1867,30 @@ class Toolbox:
                 "Otherwise use ask_clarification with these questions, giving both readings."
             )
 
-        # ---- message quality reviewer (sub-agent B) -------------------------
-        # Run once per turn, only when no structural problems remain.
-        if (
-            not problems
-            and not self._message_reviewed
-            and disposition
-            in (
-                "conditional_handoff",
-                "report_infeasible",
-                "ask_clarification",
-            )
-        ):
+        # ---- D1 rubric checker: required facts coverage -------------------------
+        # Runs for all dispositions (not just 3); uses grade_checklist() for yes/no per item.
+        if not problems and not self._message_reviewed:
             self._message_reviewed = True
             try:
-                from .subagents import REVIEW_CHECKLIST
-                from .subagents import review_message as _rm
+                from .decision1 import get_client as _get_d1
 
-                if disposition in REVIEW_CHECKLIST:
-                    rv = _rm(disposition, message, self._review_facts(expanded))
-                    if rv and rv.get("missing"):
-                        problems.extend(rv["missing"])
-            except Exception:  # noqa: BLE001, S110 — reviewer is advisory, never block on failure
+                d1 = _get_d1()
+                if d1 is not None:
+                    n_opts = sum(
+                        1 for o in (expanded or []) if o.get("status") != "booked"
+                    )
+                    checklist = _rubric_items(
+                        disposition, n_opts, self.assumptions or []
+                    )
+                    if checklist:
+                        grades = d1.grade_checklist(message, checklist)
+                        if grades:
+                            for n, satisfied in grades.items():
+                                if not satisfied and 1 <= n <= len(checklist):
+                                    problems.append(
+                                        f"Required content missing: {checklist[n - 1]}"
+                                    )
+            except Exception:  # noqa: BLE001, S110 — rubric check is advisory, never block on failure
                 pass
 
         if problems:
