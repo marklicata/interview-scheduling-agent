@@ -592,6 +592,13 @@ If the core ask is scheduling and only an add-on is blocked by policy (a person 
 # GPT response format requirements (iter38 analysis — GPT-6.1-sol specific gaps)
 These rules address patterns where GPT-6 omits required content that the eval checks for.
 
+- must_communicate_facts: when search_schedules returns a "must_communicate_facts" key, every item
+  in that list MUST be explicitly stated in your response before calling submit_response. Each item
+  is a specific verifiable fact the recruiter needs — not guidance. Example items: "Priya is OOO;
+  the Dec-01 slot works only if she agrees", "Alex's calendar could not be read". Include every one,
+  verbatim or paraphrased, as a plain sentence in the reply body. If you omit any, the recruiter
+  lacks information they need to act.
+
 - Never give a bare outcome. For every refusal, constraint, or unusual result give all three:
   (1) what blocked it (the rule or cap reached), (2) the evidence (cite the calendar entry, the tool
   result, or the stated policy), and (3) the recruiter-owned next step. Example: "Not booked because
@@ -693,7 +700,9 @@ import re as _re
 
 
 def _section(prompt: str, title: str) -> str:
-    m = _re.search(r"(?m)^# " + _re.escape(title) + r".*?(?=^# |\Z)", prompt, _re.DOTALL)
+    m = _re.search(
+        r"(?m)^# " + _re.escape(title) + r".*?(?=^# |\Z)", prompt, _re.DOTALL
+    )
     return m.group(0).rstrip() if m else ""
 
 
@@ -709,8 +718,7 @@ _SHARED_SECTIONS = (
 )
 
 PIPELINE_SYSTEM_PROMPT = (
-    _PIPELINE_PROTOCOL
-    + "\n# Domain rules (shared with the full agent)\n"
+    _PIPELINE_PROTOCOL + "\n# Domain rules (shared with the full agent)\n"
     "The sections below are the full scheduling rules, written for an agent that runs its own "
     "searches and chooses its own disposition. In THIS pipeline code already ran search_schedules, "
     "executed any authorized write, and chose the disposition; where a rule below names a tool "

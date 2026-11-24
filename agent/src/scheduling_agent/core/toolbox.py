@@ -940,6 +940,13 @@ class Toolbox:
             if scope_info:
                 out["session_scope"] = scope_info
 
+        # --- Pre-write fact injection ----------------------------------------
+        # Include must-communicate facts so the LLM sees what it must state
+        # BEFORE writing its response — not as a post-hoc gatekeeper.
+        mc_facts = [f.claim for f in self.facts.values() if f.must_communicate]
+        if mc_facts:
+            out["must_communicate_facts"] = mc_facts
+
         return out
 
     def _note_search_facts(self, near_fits: list, diagnosis: list) -> None:
@@ -1887,10 +1894,12 @@ class Toolbox:
                 "Otherwise use ask_clarification with these questions, giving both readings."
             )
 
-        # ---- D1 rubric checker: required facts coverage -------------------------
-        # Fact-specific D1 questions from tool-emitted FactNotes plus
-        # per-disposition structural items.
-        if not problems and not self._message_reviewed:
+        # ---- D1 rubric: observability only (no rejection) -------------------------
+        # Facts are now injected into the search result before the LLM writes
+        # (must_communicate_facts key). The rubric check here is telemetry only;
+        # it does NOT reject submissions or trigger retries — that caused
+        # unnecessary_handoff_or_refusal regressions (iter40-42).
+        if not self._message_reviewed:
             self._message_reviewed = True
             try:
                 from .decision1 import get_client as _get_d1
@@ -1906,14 +1915,9 @@ class Toolbox:
                     struct_items = _structural_items(disposition, n_opts)
                     checklist = (fact_items + struct_items)[:10]
                     if checklist:
-                        grades = d1.grade_checklist(message, checklist)
-                        if grades:
-                            for n, satisfied in grades.items():
-                                if not satisfied and 1 <= n <= len(checklist):
-                                    problems.append(
-                                        f"Required content missing: {checklist[n - 1]}"
-                                    )
-            except Exception:  # noqa: BLE001, S110 - rubric check is advisory
+                        d1.grade_checklist(message, checklist)
+                        # Result is telemetry only — not used to gate the response.
+            except Exception:  # noqa: BLE001, S110 — rubric telemetry is advisory
                 pass
 
         if problems:
