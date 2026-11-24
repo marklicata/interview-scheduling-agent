@@ -611,6 +611,40 @@ def _structural_items(disposition: str, n_opts: int) -> list:
     return []
 
 
+def _claim_to_statement(claim: str) -> str:
+    """Convert a D1 rubric question to a plain fact statement for LLM injection.
+
+    D1 questions are framed as "Does the message say X?" — the LLM must NOT
+    see these as questions to answer; it must see them as facts to include.
+    Example: "Does the message say the Dec-01 slot needs Priya to agree?"
+           → "The Dec-01 slot needs Priya to agree"
+    """
+    import re as _re
+
+    s = claim.strip()
+    for prefix in (
+        "Does the message say that ",
+        "Does the message say ",
+        "Does the message state that ",
+        "Does the message state ",
+        "Does the message explain that ",
+        "Does the message explain ",
+        "Does the message mention that ",
+        "Does the message mention ",
+        "Does the message ask ",
+        "Does the message give ",
+    ):
+        if s.lower().startswith(prefix.lower()):
+            s = s[len(prefix) :]
+            break
+    # Strip parenthetical "(Expected: …)" annotations added for context
+    s = _re.sub(r"\s*\(Expected:.*?\)", "", s)
+    s = s.rstrip("?").strip()
+    if s:
+        s = s[0].upper() + s[1:]
+    return s
+
+
 class Toolbox:
     def __init__(self, inputs: dict, provider, policy: FallbackPolicy | None = None):
         self.inputs = inputs
@@ -943,7 +977,13 @@ class Toolbox:
         # --- Pre-write fact injection ----------------------------------------
         # Include must-communicate facts so the LLM sees what it must state
         # BEFORE writing its response — not as a post-hoc gatekeeper.
-        mc_facts = [f.claim for f in self.facts.values() if f.must_communicate]
+        # Use plain statements (not D1 rubric questions) so the LLM doesn't
+        # misread them as questions to answer.
+        mc_facts = [
+            _claim_to_statement(f.claim)
+            for f in self.facts.values()
+            if f.must_communicate
+        ][:5]  # cap at 5 to avoid overwhelming the LLM
         if mc_facts:
             out["must_communicate_facts"] = mc_facts
 
