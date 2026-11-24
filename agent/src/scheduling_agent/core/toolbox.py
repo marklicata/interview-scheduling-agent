@@ -18,6 +18,13 @@ from . import intervals as iv
 from . import settings as rs
 from .authority import WriteGate
 from .availability import Directory, availability_window, resolve_availability
+from .factnotes import (
+    KIND_GATE_PENDING,
+    KIND_INFEASIBLE,
+    KIND_LOOKUP_FAILED,
+    KIND_NEAR_FIT,
+    FactNote,
+)
 from .fallbacks import DEFAULT_POLICY, FallbackPolicy
 from .scheduler import Engine, parse_spec
 from .timeutil import (
@@ -574,97 +581,34 @@ OVERRIDE_REASONS = {
 }
 
 
-def _rubric_items(disposition: str, n_opts: int, assumptions: list) -> list:
-    """Per-disposition required-content checklist for the D1 rubric check.
+def _structural_items(disposition: str, n_opts: int) -> list:
+    """Generic per-disposition structural checklist for the D1 rubric check.
 
-    Returns yes/no factual statements that decision1.grade_checklist() evaluates.
-    Every item should be a concrete fact the message either contains or doesn't.
+    Fact-specific items come from FactNotes; these only cover message shape.
     """
-    items = []
-
     if disposition == "propose_options":
-        items.append(
-            f"The message presents {max(1, n_opts)} schedule option(s) with specific dates and times"
-        )
-        items.append("The message states the times are not yet reserved or confirmed")
-        items.append(
-            "The message asks the recruiter to choose an option or confirm one to book"
-        )
-
-    elif disposition == "report_infeasible":
-        items.append(
-            "The message explains specifically why no valid schedule exists "
-            "(names who is unavailable, which constraint is violated, or what is missing)"
-        )
-        items.append(
-            "The message suggests a concrete path forward "
-            "(more availability, exception approval, constraint relaxation, or substitution)"
-        )
-
-    elif disposition == "conditional_handoff":
-        items.append(
-            "The message explains what condition must be met and who the recruiter must contact"
-        )
-        items.append(
-            "The message gives the recruiter a specific action to take (who to ask, what to ask for)"
-        )
-
-    elif disposition == "ask_clarification":
-        items.append(
-            "The message asks a specific, focused clarifying question (not a vague request for more info)"
-        )
-
-    elif disposition in ("book", "reschedule"):
-        items.append(
+        return [
+            f"The message presents {max(1, n_opts)} schedule option(s) with specific dates and times",
+            "The message states the times are not yet reserved or confirmed",
+            "The message asks the recruiter to choose an option or confirm one to book",
+        ]
+    if disposition == "report_infeasible":
+        return [
+            "The message explains why no valid schedule exists (who is unavailable, which constraint is violated, or what is missing)"
+        ]
+    if disposition == "ask_clarification":
+        return ["The message asks a specific, focused clarifying question"]
+    if disposition in ("book", "reschedule"):
+        return [
             "The message confirms what was booked or rescheduled and states that invitations have been sent"
-        )
-
-    elif disposition == "cancel":
-        items.append(
+        ]
+    if disposition == "cancel":
+        return [
             "The message confirms what was cancelled and states that cancellation notices will be sent to attendees"
-        )
-
-    elif disposition == "request_availability":
-        items.append(
-            "The message requests availability from a specific person for a specific date range or purpose"
-        )
-
-    elif disposition == "escalate":
-        items.append(
-            "The message names the specific person or authority who must act and what they need to do"
-        )
-
-    # Universal: blocking dispositions must name the specific blocker
-    if disposition not in (
-        "book",
-        "reschedule",
-        "cancel",
-        "acknowledge_and_record",
-        "update_memory",
-        "propose_options",
-    ):
-        items.append(
-            "The message names the specific blocker "
-            "(person, rule, missing information, or failed lookup) preventing progress"
-        )
-
-    # Universal: non-trivial dispositions must give a recruiter-owned next step
-    if disposition not in (
-        "book",
-        "reschedule",
-        "acknowledge_and_record",
-        "update_memory",
-    ):
-        items.append(
-            "The message gives the recruiter a concrete next step "
-            "(what to do, who to contact, or what to decide)"
-        )
-
-    # Disclose significant assumptions
-    for a in (assumptions or [])[:2]:
-        items.append(f"The message discloses the assumption: {a}")
-
-    return items
+        ]
+    if disposition == "conditional_handoff":
+        return ["The message names who must act and the condition that must be met"]
+    return []
 
 
 class Toolbox:
@@ -690,6 +634,7 @@ class Toolbox:
         self.searches: dict = {}  # option id -> option
         self.last_search_args: dict | None = None
         self.assumptions: list = []
+        self.facts: dict[str, FactNote] = {}  # dedupe_key -> FactNote
         self.final: dict | None = None
         self.case_changed = False
         self._opt_counter = 0
@@ -709,6 +654,10 @@ class Toolbox:
         if callable(getattr(self.provider, "lookup_people", None)):
             tools.insert(-1, LOOKUP_TOOL)
         return tools
+
+    def _note(self, fact: FactNote) -> None:
+        """Register a FactNote, deduplicating by dedupe_key."""
+        self.facts[fact.dedupe_key] = fact
 
     # ------------------------------------------------------------------ dispatch
     def call(self, name: str, args: dict) -> tuple:
@@ -951,10 +900,13 @@ class Toolbox:
             self._last_near_fits = near_fits
             self._last_cond_hours = cond_hours
             self._last_diagnosis = out.get("diagnosis") or []
+            self._note_search_facts(near_fits, self._last_diagnosis)
         else:
             self._last_near_fits = []
             self._last_cond_hours = []
             self._last_diagnosis = []
+
+        self._note_coverage_facts(av)
 
         # --- Gate scope summary ---------------------------------------------
         # Tell the LLM which sessions are held, booked, or completed so it
@@ -962,6 +914,15 @@ class Toolbox:
         if _scope is not None:
             scope_info: dict = {}
             if _scope.held:
+                for _sid in list(_scope.held)[:3]:
+                    self._note(
+                        FactNote(
+                            kind=KIND_GATE_PENDING,
+                            claim=f"Does the message say session {_sid} is on hold until its pending gate result is received?",
+                            subject=str(_sid),
+                            evidence={"session": str(_sid)},
+                        )
+                    )
                 scope_info["held_pending_gate"] = _scope.held
                 scope_info["held_note"] = (
                     f"Sessions {_scope.held} are blocked by a pending gate result. "
@@ -980,6 +941,65 @@ class Toolbox:
                 out["session_scope"] = scope_info
 
         return out
+
+    def _note_search_facts(self, near_fits: list, diagnosis: list) -> None:
+        """Emit FactNotes for near-fits and infeasibility diagnosis (advisory)."""
+        try:
+            for nf in (near_fits or [])[:3]:
+                if not isinstance(nf, dict):
+                    continue
+                pid = nf.get("blocking_participant") or nf.get("participant_id") or ""
+                resolved = self.directory.resolve(pid) or pid
+                person = self.directory.people.get(resolved)
+                name = getattr(person, "name", None) or pid or "someone"
+                status = nf.get("observed_status") or "unavailable"
+                start = str(nf.get("start") or "")
+                self._note(
+                    FactNote(
+                        kind=KIND_NEAR_FIT,
+                        claim=(
+                            f"Does the message say the {start[:10] or 'proposed'} slot "
+                            f"works only if {name} (currently {status}) agrees?"
+                        ),
+                        subject=name,
+                        evidence={"slot": start, "status": status, "pid": pid},
+                        dedupe_key=f"{KIND_NEAR_FIT}:{pid}:{start[:10]}",
+                    )
+                )
+            if not near_fits:
+                for d in (diagnosis or [])[:2]:
+                    d = str(d)
+                    self._note(
+                        FactNote(
+                            kind=KIND_INFEASIBLE,
+                            claim=f"Does the message explain why no schedule is possible? (Expected: {d[:80]})",
+                            subject="schedule",
+                            evidence={"diagnosis": d},
+                            dedupe_key=f"{KIND_INFEASIBLE}:{d[:40]}",
+                        )
+                    )
+        except Exception:  # noqa: BLE001, S110 - advisory
+            pass
+
+    def _note_coverage_facts(self, av: dict) -> None:
+        """Emit FactNotes for participants whose availability could not be fully read."""
+        try:
+            for pid, a in (av or {}).items():
+                if getattr(a, "coverage", "complete") not in ("unknown", "partial"):
+                    continue
+                person = self.directory.people.get(pid)
+                name = getattr(person, "name", None) or pid
+                self._note(
+                    FactNote(
+                        kind=KIND_LOOKUP_FAILED,
+                        claim=f"Does the message state that {name}'s availability could not be fully read or is unconfirmed?",
+                        subject=name,
+                        evidence={"pid": pid, "coverage": a.coverage},
+                        dedupe_key=f"{KIND_LOOKUP_FAILED}:{pid}",
+                    )
+                )
+        except Exception:  # noqa: BLE001, S110 - advisory
+            pass
 
     def t_check_schedule(self, assignments, **kw):
         eng, _ = self._engine(**kw)
@@ -1868,7 +1888,8 @@ class Toolbox:
             )
 
         # ---- D1 rubric checker: required facts coverage -------------------------
-        # Runs for all dispositions (not just 3); uses grade_checklist() for yes/no per item.
+        # Fact-specific D1 questions from tool-emitted FactNotes plus
+        # per-disposition structural items.
         if not problems and not self._message_reviewed:
             self._message_reviewed = True
             try:
@@ -1876,12 +1897,14 @@ class Toolbox:
 
                 d1 = _get_d1()
                 if d1 is not None:
+                    fact_items = [
+                        f.claim for f in self.facts.values() if f.must_communicate
+                    ]
                     n_opts = sum(
                         1 for o in (expanded or []) if o.get("status") != "booked"
                     )
-                    checklist = _rubric_items(
-                        disposition, n_opts, self.assumptions or []
-                    )
+                    struct_items = _structural_items(disposition, n_opts)
+                    checklist = (fact_items + struct_items)[:10]
                     if checklist:
                         grades = d1.grade_checklist(message, checklist)
                         if grades:
@@ -1890,7 +1913,7 @@ class Toolbox:
                                     problems.append(
                                         f"Required content missing: {checklist[n - 1]}"
                                     )
-            except Exception:  # noqa: BLE001, S110 — rubric check is advisory, never block on failure
+            except Exception:  # noqa: BLE001, S110 - rubric check is advisory
                 pass
 
         if problems:
